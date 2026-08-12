@@ -1,11 +1,11 @@
-import { CTA_HREF } from './content/landingContent.js';
 import Header from './components/Header.jsx';
 import Hero from './components/Hero.jsx';
 import Comparison from './components/Comparison.jsx';
 import Journey from './components/Journey.jsx';
 import FeatureShowcase from './components/FeatureShowcase.jsx';
-
-const ExploreLink = () => <a href={CTA_HREF}>모집 중인 동아리 보기</a>;
+import FinalCta from './components/FinalCta.jsx';
+import Footer from './components/Footer.jsx';
+import Reveal from './components/Reveal.jsx';
 
 export default function App() {
   return (
@@ -13,13 +13,12 @@ export default function App() {
       <Header />
       <main>
         <Hero />
-        <Comparison />
-        <Journey />
-        <FeatureShowcase />
-        <section>
-          <ExploreLink />
-        </section>
+        <Reveal><Comparison /></Reveal>
+        <Reveal><Journey /></Reveal>
+        <Reveal><FeatureShowcase /></Reveal>
+        <Reveal><FinalCta /></Reveal>
       </main>
+      <Footer />
     </>
   );
 }

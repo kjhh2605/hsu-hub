@@ -1306,6 +1306,164 @@
   font-size: 9px;
 }
 
+.final-cta {
+  padding-top: 30px;
+  padding-bottom: 120px;
+  background: #fff;
+}
+
+.final-cta-card {
+  position: relative;
+  display: grid;
+  min-height: 520px;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 42px 42px 92px 42px;
+  background:
+    radial-gradient(circle at 81% 18%, rgba(93, 154, 255, 0.6), transparent 26%),
+    linear-gradient(135deg, #063568 0%, #0c4a8a 50%, #175fb7 100%);
+  box-shadow: 0 30px 80px rgba(6, 53, 104, 0.23);
+  color: #fff;
+}
+
+.final-cta-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(90deg, #000, transparent 83%);
+}
+
+.final-cta-copy {
+  position: relative;
+  z-index: 3;
+  max-width: 680px;
+  padding: 70px 0 70px 76px;
+}
+
+.final-cta-copy .eyebrow {
+  color: var(--sky-strong);
+  font-size: 12px;
+  letter-spacing: 0.07em;
+}
+
+.final-cta-copy h2 {
+  margin-bottom: 20px;
+  font-size: clamp(46px, 5vw, 66px);
+  font-weight: 820;
+  letter-spacing: -0.062em;
+  line-height: 1.1;
+}
+
+.final-cta-copy > p:not(.eyebrow) {
+  max-width: 530px;
+  margin-bottom: 33px;
+  color: #c8ddf1;
+  font-size: 16px;
+}
+
+.final-cta-character {
+  position: absolute;
+  right: -55px;
+  bottom: -140px;
+  width: 530px;
+  height: 530px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.final-cta-character img {
+  position: absolute;
+  width: 780px;
+  max-width: none;
+  top: -20px;
+  left: -235px;
+  mix-blend-mode: screen;
+  opacity: 0.92;
+}
+
+.final-cta-badge {
+  position: absolute;
+  top: 34px;
+  right: 37px;
+  display: grid;
+  width: 70px;
+  height: 70px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 22px 22px 31px 22px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  line-height: 0.8;
+  backdrop-filter: blur(12px);
+}
+
+.final-cta-badge span {
+  align-self: end;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.final-cta-badge strong {
+  align-self: start;
+  font-size: 12px;
+}
+
+.site-footer {
+  padding: 68px 0 30px;
+  background: #081a30;
+  color: #fff;
+}
+
+.brand-mark--inverted {
+  color: #fff;
+}
+
+.brand-mark--inverted .brand-symbol {
+  background: #fff;
+  color: var(--hsu);
+}
+
+.footer-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 56px;
+}
+
+.footer-main > div > p {
+  margin: 16px 0 0;
+  color: #91a6bb;
+  font-size: 13px;
+}
+
+.footer-main nav {
+  display: flex;
+  gap: 30px;
+  color: #becbd8;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.footer-main nav a:hover {
+  color: #fff;
+}
+
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #728aa1;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
 @media (max-width: 1100px) {
   .feature-story,
   .feature-story--reverse {
@@ -1414,6 +1572,16 @@
 
   .feature-copy {
     max-width: 650px;
+  }
+
+  .final-cta-copy {
+    max-width: 600px;
+    padding-left: 54px;
+  }
+
+  .final-cta-character {
+    right: -220px;
+    opacity: 0.6;
   }
 }
 
@@ -1688,6 +1856,60 @@
   .preview-float-card--notice {
     top: 50px;
     right: 8px;
+  }
+
+  .final-cta {
+    padding-bottom: 80px;
+  }
+
+  .final-cta-card {
+    width: min(calc(100% - 24px), var(--container));
+    min-height: 590px;
+    align-items: start;
+    border-radius: 28px 28px 64px 28px;
+  }
+
+  .final-cta-copy {
+    padding: 56px 28px 210px;
+  }
+
+  .final-cta-copy h2 {
+    font-size: clamp(37px, 11vw, 48px);
+  }
+
+  .final-cta-copy .button {
+    width: 100%;
+  }
+
+  .final-cta-character {
+    right: -128px;
+    bottom: -238px;
+    width: 500px;
+    height: 500px;
+    opacity: 0.72;
+  }
+
+  .final-cta-character img {
+    top: 0;
+    left: -250px;
+  }
+
+  .final-cta-badge {
+    display: none;
+  }
+
+  .footer-main {
+    gap: 40px;
+    flex-direction: column;
+  }
+
+  .footer-main nav {
+    gap: 20px;
+    flex-direction: column;
+  }
+
+  .footer-bottom span:last-child {
+    display: none;
   }
 }
 

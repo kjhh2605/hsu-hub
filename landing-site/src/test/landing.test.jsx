@@ -89,4 +89,18 @@ describe('HSU Club landing page', () => {
       within(stories[1]).getByText('면접 시간 선택·변경'),
     ).toBeInTheDocument();
   });
+
+  test('closes with the agreed action and service identity', () => {
+    render(<App />);
+
+    expect(
+      screen.getByRole('heading', {
+        name: '놓치고 싶지 않은 동아리를 지금 찾아보세요.',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('한성대학교 학생을 위한 동아리 모집·지원 서비스'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('© 2026 HSU Club')).toBeInTheDocument();
+  });
 });
