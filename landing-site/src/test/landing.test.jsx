@@ -29,4 +29,26 @@ describe('HSU Club landing page', () => {
     expect(links.length).toBeGreaterThanOrEqual(3);
     links.forEach((link) => expect(link).toHaveAttribute('href', '/explore'));
   });
+
+  test('explains the hero artwork to non-visual users', () => {
+    render(<App />);
+
+    expect(
+      screen.getByRole('img', {
+        name: /HSU 캐릭터가 여러 모집 도구 사이에서/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('provides navigation to the comparison and feature proof', () => {
+    render(<App />);
+
+    expect(
+      screen.getByRole('link', { name: '기존 방식과 비교' }),
+    ).toHaveAttribute('href', '#compare');
+    expect(screen.getByRole('link', { name: '주요 기능' })).toHaveAttribute(
+      'href',
+      '#features',
+    );
+  });
 });

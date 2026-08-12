@@ -1,0 +1,28 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css');
+
+:root {
+  --ink: #0b1f3a;
+  --ink-soft: #334b68;
+  --muted: #65758a;
+  --hsu: #0c4a8a;
+  --hsu-deep: #063568;
+  --action: #2563eb;
+  --action-hover: #164dcc;
+  --sky: #dceeff;
+  --sky-strong: #b8dcff;
+  --mist: #f4f8fc;
+  --paper: #fff;
+  --line: #d8e2ec;
+  --line-dark: #b9c9da;
+  --mint: #d9f7ec;
+  --success: #147a5a;
+  --font-sans: 'Pretendard Variable', Pretendard, SUIT, 'Noto Sans KR',
+    -apple-system, BlinkMacSystemFont, sans-serif;
+  --container: 1200px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 30px;
+  --shadow-soft: 0 20px 60px rgba(21, 63, 106, 0.1);
+  --shadow-card: 0 14px 34px rgba(21, 63, 106, 0.09);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
