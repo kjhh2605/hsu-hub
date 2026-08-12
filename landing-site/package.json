@@ -1,0 +1,31 @@
+{
+  "name": "hsu-club-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "HSU Club 학생용 서비스 소개 랜딩사이트",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js,.jsx",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "lucide-react": "0.451.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.5.0",
+    "@testing-library/react": "16.0.1",
+    "@vitejs/plugin-react": "4.3.1",
+    "eslint": "8.57.1",
+    "eslint-plugin-react": "7.37.1",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "jsdom": "25.0.1",
+    "vite": "5.4.8",
+    "vitest": "2.1.2"
+  }
+}
