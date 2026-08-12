@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import App from '../App.jsx';
 
 describe('HSU Club landing page', () => {
@@ -76,5 +76,17 @@ describe('HSU Club landing page', () => {
     expect(
       screen.queryByRole('heading', { name: '간편 지원' }),
     ).not.toBeInTheDocument();
+  });
+
+  test('proves value with only the two agreed standalone feature stories', () => {
+    render(<App />);
+
+    const stories = screen.getAllByTestId('feature-story');
+    expect(stories).toHaveLength(2);
+    expect(within(stories[0]).getByText('카테고리 탐색')).toBeInTheDocument();
+    expect(within(stories[1]).getByText('진행 상태 확인')).toBeInTheDocument();
+    expect(
+      within(stories[1]).getByText('면접 시간 선택·변경'),
+    ).toBeInTheDocument();
   });
 });
