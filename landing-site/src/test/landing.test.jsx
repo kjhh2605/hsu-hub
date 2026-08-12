@@ -51,4 +51,30 @@ describe('HSU Club landing page', () => {
       '#features',
     );
   });
+
+  test('describes the four real-world tool transitions', () => {
+    render(<App />);
+
+    ['모집 확인', '지원', '지원 이후', '면접 조율'].forEach((step) => {
+      expect(screen.getAllByText(step).length).toBeGreaterThanOrEqual(1);
+    });
+    expect(
+      screen.getAllByText('공고마다 연결된 별도의 Google Form으로 이동')
+        .length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText(
+        '별도의 Google Sheets 링크에서 가능 시간을 확인·기입',
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  test('keeps applying as a journey step instead of a standalone feature', () => {
+    render(<App />);
+
+    expect(screen.getByText('지원하기')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '간편 지원' }),
+    ).not.toBeInTheDocument();
+  });
 });
