@@ -1,0 +1,14 @@
+{
+  "name": "hsu-hub-frontends",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/form",
+    "mobile",
+    "web"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspace mobile && npm run build --workspace web"
+  }
+}
