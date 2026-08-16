@@ -4,7 +4,7 @@ export class ApiError extends Error {
 function cookie(name) { return document.cookie.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1) ?? ''; }
 async function request(path, options = {}) {
   const method = options.method ?? 'GET'; const headers = { Accept: 'application/json', ...options.headers }; let body = options.body;
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) { const token = cookie('XSRF-TOKEN') || cookie('CSRF-TOKEN'); if (token) headers['X-CSRF-TOKEN'] = decodeURIComponent(token); }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) { const token = cookie('__Host-XSRF-TOKEN'); if (token) headers['X-XSRF-TOKEN'] = decodeURIComponent(token); }
   if (options.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(options.json); }
   const response = await fetch(`/api/v1${path}`, { method, credentials: 'include', headers, body });
   const payload = response.headers.get('content-type')?.includes('application/json') ? await response.json() : null;

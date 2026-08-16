@@ -22,10 +22,10 @@ function mount(path, session = null, clubs = []) {
 
 describe('operator production contract', () => {
   it('sends session cookies and CSRF for a publish mutation', async () => {
-    document.cookie = 'XSRF-TOKEN=operator-csrf';
+    document.cookie = '__Host-XSRF-TOKEN=operator-csrf; Path=/; Secure';
     const mock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 201, headers: new Headers({ 'content-type': 'application/json' }), json: async () => ({ success: true, data: { id: 'r1' } }) });
     await api.post('/operator/clubs/c1/recruitments', { title: '모집' });
-    expect(mock).toHaveBeenCalledWith('/api/v1/operator/clubs/c1/recruitments', expect.objectContaining({ credentials: 'include', headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'operator-csrf' }) }));
+    expect(mock).toHaveBeenCalledWith('/api/v1/operator/clubs/c1/recruitments', expect.objectContaining({ credentials: 'include', headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'operator-csrf' }) }));
   });
 
   it('guards all operator pages behind the host-local login session', async () => {

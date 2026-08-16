@@ -16,8 +16,8 @@ async function request(path, options = {}) {
   const method = options.method ?? 'GET';
   const headers = { Accept: 'application/json', ...options.headers };
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    const csrf = cookie('XSRF-TOKEN') || cookie('CSRF-TOKEN');
-    if (csrf) headers['X-CSRF-TOKEN'] = decodeURIComponent(csrf);
+    const csrf = cookie('__Host-XSRF-TOKEN');
+    if (csrf) headers['X-XSRF-TOKEN'] = decodeURIComponent(csrf);
   }
   let body = options.body;
   if (options.json !== undefined) {

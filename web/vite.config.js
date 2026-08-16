@@ -34,6 +34,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    environmentOptions: { jsdom: { url: 'https://admin.hsu-hub.site/' } },
     globals: true,
     setupFiles: ['./src/test/setup.js'],
     css: true,

@@ -24,14 +24,14 @@ function renderRoute(route, session = null) {
 
 describe('applicant production contract', () => {
   it('sends cookies and CSRF on mutations and unwraps ApiResponse', async () => {
-    document.cookie = 'XSRF-TOKEN=csrf-value';
+    document.cookie = '__Host-XSRF-TOKEN=csrf-value; Path=/; Secure';
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true, status: 200, headers: new Headers({ 'content-type': 'application/json' }),
       json: async () => ({ success: true, data: { id: 'u1' } }),
     });
     await expect(api.post('/auth/logout')).resolves.toEqual({ id: 'u1' });
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/logout', expect.objectContaining({
-      credentials: 'include', headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'csrf-value' }),
+      credentials: 'include', headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'csrf-value' }),
     }));
   });
 
