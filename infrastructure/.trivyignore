@@ -1,0 +1,11 @@
+# CloudFront WAF is an explicitly accepted 30-user pilot risk documented in INFRASTRUCTURE.md.
+AVD-AWS-0011
+
+# CloudFront VPC Origin reaches an internal-only ALB over the private VPC service-ENI path.
+AVD-AWS-0054
+
+# The private instance has HTTPS-only internet egress through the required NAT; DNS and time sync are separately scoped.
+AVD-AWS-0104
+
+# SSE-S3 is required for the centralized S3/ALB/CloudFront access-log destination and still encrypts every bucket at rest.
+AVD-AWS-0132
