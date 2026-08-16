@@ -143,10 +143,12 @@ jobs:
         run: |
           aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}"
           docker push "$REPOSITORY_URI:$IMAGE_TAG"
+      - name: Install frontend dependencies
+        run: npm ci
       - name: Build applicant frontend
-        run: npm --prefix mobile ci && npm --prefix mobile run build
+        run: npm run build --workspace mobile
       - name: Build operator frontend
-        run: npm --prefix web ci && npm --prefix web run build
+        run: npm run build --workspace web
       - name: Deploy backend through SSM
         run: bash ops/deploy.sh "$IMAGE_TAG"
       - name: Publish versioned frontends
