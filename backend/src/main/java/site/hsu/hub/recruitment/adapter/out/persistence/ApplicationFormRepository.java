@@ -1,0 +1,1 @@
+package site.hsu.hub.recruitment.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.Optional;public interface ApplicationFormRepository extends JpaRepository<ApplicationFormEntity,Long>{Optional<ApplicationFormEntity>findByRecruitmentId(Long id);}

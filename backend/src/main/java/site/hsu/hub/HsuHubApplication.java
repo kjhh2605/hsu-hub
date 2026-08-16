@@ -1,0 +1,12 @@
+package site.hsu.hub;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication(exclude=org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class)
+@org.springframework.scheduling.annotation.EnableScheduling
+public class HsuHubApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(HsuHubApplication.class, args);
+    }
+}

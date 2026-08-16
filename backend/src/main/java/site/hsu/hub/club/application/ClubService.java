@@ -1,0 +1,20 @@
+package site.hsu.hub.club.application;
+import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import org.springframework.transaction.support.*;import site.hsu.hub.club.adapter.out.persistence.*;import site.hsu.hub.club.api.*;import site.hsu.hub.club.domain.ClubRole;import site.hsu.hub.common.exception.*;import site.hsu.hub.file.api.*;import site.hsu.hub.identity.api.CurrentUser;import java.time.Instant;import java.util.*;
+@Service public class ClubService implements ClubScope {
+ private final ClubRepository clubs;private final ClubUserRepository mappings;private final CurrentUser current;private final FileStorageService files;private final ClubRecruitmentSummaryReader recruitments;
+ public ClubService(ClubRepository clubs,ClubUserRepository mappings,CurrentUser current,FileStorageService files,ClubRecruitmentSummaryReader recruitments){this.clubs=clubs;this.mappings=mappings;this.current=current;this.files=files;this.recruitments=recruitments;}
+ @Transactional(readOnly=true)public List<ClubView> list(){var found=clubs.findAll();var summaries=recruitments.currentForClubs(found.stream().map(ClubEntity::id).toList(),Instant.now());return found.stream().map(c->view(c,summaries.get(c.id()))).toList();}
+ @Transactional(readOnly=true)public ClubView get(Long id){var c=find(id);var s=recruitments.currentForClubs(List.of(id),Instant.now()).get(id);return view(c,s);}
+ @Transactional(readOnly=true)public List<ClubView> operatorClubs(){var u=current.require();if(u.serviceAdmin())return list();var ids=mappings.findByUserIdAndRole(u.id(),ClubRole.OPERATOR).stream().map(ClubUserEntity::clubId).toList();var summaries=recruitments.currentForClubs(ids,Instant.now());return clubs.findAllById(ids).stream().map(c->view(c,summaries.get(c.id()))).toList();}
+ @Transactional(readOnly=true)public ClubView operatorGet(Long id){requireOperator(id);return get(id);}
+ @Transactional public ClubView update(Long id,UpdateClub command){requireOperator(id);var c=find(id);c.update(command.shortIntroduction(),command.detailedIntroduction(),command.activityPeriod(),command.activityPlace());return view(c,null);}
+ @Transactional public ClubView replaceCover(Long id,String filename,String type,byte[] bytes){requireOperator(id);var stored=files.storeCover(filename,type,bytes);var c=find(id);Long old=c.replaceCover(stored.id());if(old!=null&&TransactionSynchronizationManager.isSynchronizationActive())TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){public void afterCommit(){try{files.delete(old);}catch(RuntimeException ignored){}}});return view(c,null);}
+ @Transactional(readOnly=true)public StoredFile cover(Long id){var c=find(id);if(c.coverFileAssetId()==null)throw new ApiException(ErrorCode.NOT_FOUND);return files.read(c.coverFileAssetId());}
+ public void requireOperator(Long clubId){var u=current.require();if(!u.serviceAdmin()&&!mappings.existsByUserIdAndClubIdAndRole(u.id(),clubId,ClubRole.OPERATOR))throw new ApiException(ErrorCode.NOT_FOUND);}
+ @Transactional public void lockOperatorClub(Long id){requireOperator(id);clubs.findByIdForUpdate(id).orElseThrow(()->new ApiException(ErrorCode.NOT_FOUND));}
+ public boolean canOperate(Long userId,Long id){var u=current.require();return u.id().equals(userId)&&(u.serviceAdmin()||mappings.existsByUserIdAndClubIdAndRole(userId,id,ClubRole.OPERATOR));}
+ private ClubEntity find(Long id){return clubs.findById(id).orElseThrow(()->new ApiException(ErrorCode.NOT_FOUND));}
+ private static ClubView view(ClubEntity c,ClubRecruitmentSummaryReader.Summary s){return new ClubView(c.id(),c.name(),c.category(),c.shortIntroduction(),c.detailedIntroduction(),c.activityPeriod(),c.activityPlace(),c.coverFileAssetId()!=null,s);}
+ public record UpdateClub(String shortIntroduction,String detailedIntroduction,String activityPeriod,String activityPlace){}
+ public record ClubView(Long id,String name,String category,String shortIntroduction,String detailedIntroduction,String activityPeriod,String activityPlace,boolean hasCover,ClubRecruitmentSummaryReader.Summary recruitment){}
+}

@@ -1,0 +1,1 @@
+package site.hsu.hub.recruitment.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.List;public interface FormStepRepository extends JpaRepository<FormStepEntity,Long>{List<FormStepEntity>findByFormIdOrderByOrder(Long id);}
