@@ -1,0 +1,167 @@
+name: production
+
+on:
+  pull_request:
+    paths:
+      - infrastructure/**
+      - deploy/**
+      - ops/**
+      - .github/workflows/production.yml
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the validated revision to production
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  DOMAIN_NAME: hsu-hub.site
+  CDK_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+  OPERATIONS_PRINCIPAL_ARN: ${{ vars.OPERATIONS_PRINCIPAL_ARN }}
+  ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+  SES_PRODUCTION_ACCESS_ACKNOWLEDGED: ${{ vars.SES_PRODUCTION_ACCESS_ACKNOWLEDGED }}
+  GITHUB_REPOSITORY_CONTEXT: ${{ github.repository }}
+  GITHUB_ENVIRONMENT_CONTEXT: production
+
+jobs:
+  validate:
+    name: Validate infrastructure and operations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: infrastructure/package-lock.json
+      - name: Install infrastructure dependencies
+        working-directory: infrastructure
+        run: npm ci
+      - name: Infrastructure tests
+        working-directory: infrastructure
+        run: npm test
+      - name: TypeScript build
+        working-directory: infrastructure
+        run: npm run build
+      - name: CDK strict synth and cdk-nag
+        working-directory: infrastructure
+        run: >-
+          npm run synth -- --lookups false
+          -c account="$CDK_ACCOUNT"
+          -c region="$AWS_REGION"
+          -c domainName="$DOMAIN_NAME"
+          -c githubRepository="$GITHUB_REPOSITORY_CONTEXT"
+          -c githubEnvironment="$GITHUB_ENVIRONMENT_CONTEXT"
+          -c operationsPrincipalArn="$OPERATIONS_PRINCIPAL_ARN"
+          -c alertEmail="$ALERT_EMAIL"
+          -c sesProductionAccessAcknowledged="$SES_PRODUCTION_ACCESS_ACKNOWLEDGED"
+      - name: Synthesized IaC security scan
+        run: >-
+          docker run --rm -v "$PWD:/workspace:ro"
+          aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 config
+          --skip-version-check --severity HIGH,CRITICAL --exit-code 1
+          --ignorefile /workspace/infrastructure/.trivyignore
+          /workspace/infrastructure/cdk.out
+      - name: Operations contract checks
+        run: bash ops/test.sh
+
+  deploy:
+    name: Deploy approved production revision
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # Required only to exchange the GitHub OIDC token for the scoped AWS role.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: infrastructure/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: hsu-hub-${{ github.run_id }}
+      - name: Install and validate infrastructure
+        working-directory: infrastructure
+        run: npm ci && npm test && npm run build
+      - name: Deploy approved CDK changes
+        working-directory: infrastructure
+        run: >-
+          npx cdk deploy HsuHubDnsCertificate HsuHubPlatform
+          --concurrency 1
+          --require-approval never
+          --outputs-file cdk-outputs.json
+          -c account="$CDK_ACCOUNT"
+          -c region="$AWS_REGION"
+          -c domainName="$DOMAIN_NAME"
+          -c githubRepository="$GITHUB_REPOSITORY_CONTEXT"
+          -c githubEnvironment="$GITHUB_ENVIRONMENT_CONTEXT"
+          -c operationsPrincipalArn="$OPERATIONS_PRINCIPAL_ARN"
+          -c alertEmail="$ALERT_EMAIL"
+          -c sesProductionAccessAcknowledged="$SES_PRODUCTION_ACCESS_ACKNOWLEDGED"
+      - name: Backend tests
+        run: |
+          test -x backend/gradlew
+          (cd backend && ./gradlew test)
+      - name: Build backend image
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          repository_uri=$(aws cloudformation describe-stacks --stack-name HsuHubPlatform --query "Stacks[0].Outputs[?OutputKey=='BackendRepositoryUri'].OutputValue | [0]" --output text)
+          docker build --pull --tag "$repository_uri:$IMAGE_TAG" backend
+          printf 'REPOSITORY_URI=%s\nIMAGE_TAG=%s\n' "$repository_uri" "$IMAGE_TAG" >> "$GITHUB_ENV"
+      - name: image scan
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 image
+          --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL
+          "$REPOSITORY_URI:$IMAGE_TAG"
+      - name: Push backend image
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}"
+          docker push "$REPOSITORY_URI:$IMAGE_TAG"
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build applicant frontend
+        run: npm run build --workspace mobile
+      - name: Build operator frontend
+        run: npm run build --workspace web
+      - name: Deploy backend through SSM
+        run: bash ops/deploy.sh "$IMAGE_TAG"
+      - name: Publish versioned frontends
+        run: |
+          applicant_bucket=$(aws cloudformation describe-stacks --stack-name HsuHubPlatform --query "Stacks[0].Outputs[?OutputKey=='ApplicantBucketName'].OutputValue | [0]" --output text)
+          admin_bucket=$(aws cloudformation describe-stacks --stack-name HsuHubPlatform --query "Stacks[0].Outputs[?OutputKey=='AdminBucketName'].OutputValue | [0]" --output text)
+          applicant_distribution=$(aws cloudformation describe-stacks --stack-name HsuHubPlatform --query "Stacks[0].Outputs[?OutputKey=='ApplicantDistributionId'].OutputValue | [0]" --output text)
+          admin_distribution=$(aws cloudformation describe-stacks --stack-name HsuHubPlatform --query "Stacks[0].Outputs[?OutputKey=='AdminDistributionId'].OutputValue | [0]" --output text)
+          aws s3 sync mobile/dist "s3://$applicant_bucket/releases/$IMAGE_TAG/" --delete --only-show-errors
+          aws s3 sync mobile/dist "s3://$applicant_bucket/" --delete --exclude 'releases/*' --only-show-errors
+          aws s3 sync web/dist "s3://$admin_bucket/releases/$IMAGE_TAG/" --delete --only-show-errors
+          aws s3 sync web/dist "s3://$admin_bucket/" --delete --exclude 'releases/*' --only-show-errors
+          aws cloudfront create-invalidation --distribution-id "$applicant_distribution" --paths '/*'
+          aws cloudfront create-invalidation --distribution-id "$admin_distribution" --paths '/*'
+      - name: Production smoke hooks
+        run: bash ops/smoke.sh

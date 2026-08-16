@@ -1,0 +1,1 @@
+package site.hsu.hub.application.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.*;public interface ApplicationAnswerRepository extends JpaRepository<ApplicationAnswerEntity,Long>{List<ApplicationAnswerEntity>findByApplicationId(Long id);List<ApplicationAnswerEntity>findByApplicationIdIn(Collection<Long>ids);}

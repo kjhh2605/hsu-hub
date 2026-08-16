@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily HSU Hub MySQL backup timer
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 UTC
+RandomizedDelaySec=900
+Persistent=true
+Unit=hsu-hub-backup.service
+
+[Install]
+WantedBy=timers.target

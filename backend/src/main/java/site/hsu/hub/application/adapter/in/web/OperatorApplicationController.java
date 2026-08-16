@@ -1,0 +1,8 @@
+package site.hsu.hub.application.adapter.in.web;
+import jakarta.servlet.http.HttpServletRequest;import org.springframework.http.*;import org.springframework.web.bind.annotation.*;import site.hsu.hub.application.application.ApplicationService;import site.hsu.hub.common.api.*;import java.nio.charset.StandardCharsets;import java.util.List;
+@RestController@RequestMapping("/api/v1/operator")public class OperatorApplicationController implements OperatorApplicationControllerDocs{
+ private final ApplicationService service;public OperatorApplicationController(ApplicationService service){this.service=service;}
+ @Override@GetMapping("/recruitments/{id}/applications")public ApiResponse<List<ApplicationService.ApplicationSummary>>list(@PathVariable Long id,HttpServletRequest req){return Responses.ok(service.list(id),req);}
+ @Override@GetMapping("/applications/{id}")public ApiResponse<ApplicationService.ApplicationDetail>detail(@PathVariable String id,HttpServletRequest req){return Responses.ok(service.detail(id),req);}
+ @Override@GetMapping("/applications/{id}/resume")public ResponseEntity<byte[]>resume(@PathVariable String id){var f=service.resume(id);var disposition=ContentDisposition.inline().filename(f.filename(),StandardCharsets.UTF_8).build();return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore()).header(HttpHeaders.CONTENT_DISPOSITION,disposition.toString()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox; default-src 'none'; frame-ancestors 'self'").header("Pragma","no-cache").body(f.bytes());}
+}

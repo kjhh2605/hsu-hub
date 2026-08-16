@@ -9,6 +9,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    environmentOptions: { jsdom: { url: 'https://app.hsu-hub.site/' } },
     globals: true,
   },
 });

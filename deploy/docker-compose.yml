@@ -1,0 +1,77 @@
+name: hsu-hub
+
+services:
+  backend:
+    image: ${ECR_IMAGE:?ECR_IMAGE is required}
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/hsuhub?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      HSU_HUB_SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      HSU_HUB_S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
+      HSU_HUB_S3_UPLOAD_PREFIX: uploads/
+      HSU_HUB_MAIL_FROM: ${FROM_EMAIL:?FROM_EMAIL is required}
+      AWS_REGION: ${AWS_REGION:?AWS_REGION is required}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      LOGGING_FILE_NAME: /var/log/hsu-hub/application.log
+    volumes:
+      - /opt/hsu-hub/logs:/var/log/hsu-hub
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - application
+      - egress
+    ports:
+      - "8080:8080"
+
+  db:
+    image: mysql:8.4.6
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      MYSQL_DATABASE: hsuhub
+      MYSQL_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --skip-name-resolve
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - /srv/hsu-hub/mysql:/var/lib/mysql
+    networks:
+      - application
+
+networks:
+  application:
+    internal: true
+  egress:
+    driver: bridge

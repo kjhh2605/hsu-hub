@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(import.meta.dirname, 'src'),
     },
   },
   server: {
@@ -34,6 +34,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    environmentOptions: { jsdom: { url: 'https://admin.hsu-hub.site/' } },
     globals: true,
     setupFiles: ['./src/test/setup.js'],
     css: true,
