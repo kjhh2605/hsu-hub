@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Design Tokens — Figma "CampusConnect"
+   ============================================================ */
+:root {
+  --c-primary: #0058be;
+  --c-primary-600: #2170e4;
+  --c-primary-700: #005ac2;
+  --c-bg: #f8f9ff;
+  --c-surface: #ffffff;
+  --c-ink: #0b1c30;
+  --c-ink-2: #424754;
+  --c-ink-3: #727785;
+  --c-line: #c2c6d6;
+  --sidebar-w: 288px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-[#EEF1FA] font-sans text-ink antialiased;
+    margin: 0;
+    font-feature-settings: 'tnum' on;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Accessible focus ring for keyboard users only */
+  :focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(114, 119, 133, 0.28);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(114, 119, 133, 0.45);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* --- Surfaces --- */
+  .card {
+    @apply rounded-3xl border border-line/30 bg-surface shadow-md;
+  }
+  .card-tint {
+    @apply rounded-3xl border border-line/30 bg-tint-100 shadow-card;
+  }
+  .panel {
+    @apply rounded-xl border border-line/40 bg-surface shadow-xs;
+  }
+
+  /* --- Buttons --- */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg
+      text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .btn-primary {
+    @apply btn bg-grad-primary text-white shadow-primary hover:brightness-110 active:scale-[0.985];
+  }
+  .btn-solid {
+    @apply btn bg-primary text-white hover:bg-primary-700 active:scale-[0.985];
+  }
+  .btn-secondary {
+    @apply btn border border-line/60 bg-surface text-ink hover:bg-tint-100 active:scale-[0.985];
+  }
+  .btn-ghost {
+    @apply btn text-ink-2 hover:bg-line/20 active:scale-[0.985];
+  }
+  .btn-tint {
+    @apply btn border border-line/30 bg-tint-100 text-ink hover:bg-tint-200 active:scale-[0.985];
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:brightness-110 active:scale-[0.985];
+  }
+  .btn-sm {
+    @apply h-9 px-3 text-[13px];
+  }
+  .btn-md {
+    @apply h-11 px-4 text-sm;
+  }
+  .btn-lg {
+    @apply h-14 px-5 text-base;
+  }
+
+  /* --- Form controls --- */
+  .field {
+    @apply w-full rounded-lg border border-line/60 bg-surface px-4 py-3 text-[15px] text-ink
+      placeholder:text-ink-4 transition-shadow duration-150
+      focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10;
+  }
+  .field-error {
+    @apply border-danger focus:border-danger focus:ring-danger/10;
+  }
+  .label {
+    @apply mb-2 block text-sm font-semibold text-ink;
+  }
+  .helper {
+    @apply mt-1.5 text-xs text-ink-3;
+  }
+
+  /* --- Badge --- */
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold tracking-wide;
+  }
+
+  /* --- Scroll helpers --- */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
