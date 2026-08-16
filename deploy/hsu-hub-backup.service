@@ -1,0 +1,14 @@
+[Unit]
+Description=HSU Hub encrypted MySQL backup to private S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/hsu-hub/runtime-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+NoNewPrivileges=true
