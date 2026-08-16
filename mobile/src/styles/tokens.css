@@ -1,0 +1,99 @@
+/* ============================================================
+   Design Tokens — Figma "CampusConnect" 에서 추출
+   ============================================================ */
+:root {
+  /* Brand / Primary */
+  --c-primary: #0058be;
+  --c-primary-600: #2170e4;
+  --c-primary-700: #005ac2;
+  --c-primary-ink: #07006c;
+  --c-primary-grad: linear-gradient(90deg, #0058be 0%, #0066dd 100%);
+  --c-primary-grad-diag: linear-gradient(165deg, #2170e4 0%, #0058be 100%);
+
+  /* Primary tints */
+  --c-primary-05: rgba(0, 88, 190, 0.05);
+  --c-primary-10: rgba(0, 88, 190, 0.1);
+  --c-primary-20: rgba(0, 88, 190, 0.2);
+  --c-tint-100: #eff4ff;
+  --c-tint-200: #e5eeff;
+  --c-tint-300: #dce9ff;
+  --c-tint-400: #d3e4fe;
+  --c-tint-500: #adc6ff;
+  --c-tint-blue-pale: #eaf1ff;
+
+  /* Neutrals */
+  --c-bg: #f8f9ff;
+  --c-surface: #ffffff;
+  --c-surface-alt: #eff4ff;
+  --c-ink: #0b1c30;
+  --c-ink-2: #424754;
+  --c-ink-3: #727785;
+  --c-ink-4: #9ca3af;
+  --c-line: #c2c6d6;
+  --c-line-soft: rgba(194, 198, 214, 0.3);
+  --c-line-softer: rgba(194, 198, 214, 0.2);
+  --c-line-strong: rgba(194, 198, 214, 0.6);
+
+  /* Success / Mint */
+  --c-mint: #6cf8bb;
+  --c-mint-soft: rgba(108, 248, 187, 0.2);
+  --c-mint-line: rgba(108, 248, 187, 0.5);
+  --c-success-ink: #00714d;
+  --c-success: #006c49;
+
+  /* Danger */
+  --c-danger: #ba1a1a;
+  --c-danger-ink: #93000a;
+  --c-danger-soft: #ffdad6;
+  --c-danger-10: rgba(186, 26, 26, 0.1);
+
+  /* Accent (indigo) */
+  --c-accent: #4648d4;
+  --c-accent-2: #6063ee;
+  --c-accent-10: rgba(70, 72, 212, 0.1);
+  --c-accent-soft: #e1e0ff;
+
+  /* Warning (amber-ish, 파생 토큰) */
+  --c-warn: #8a5a00;
+  --c-warn-soft: #fff2d6;
+
+  /* Radius */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+  --r-3xl: 24px;
+  --r-full: 9999px;
+
+  /* Shadows */
+  --sh-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --sh-sm: 0 2px 8px 0 rgba(0, 0, 0, 0.03);
+  --sh-md: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+  --sh-lg: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+  --sh-xl: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  --sh-primary: 0 4px 12px -2px rgba(0, 88, 190, 0.3);
+  --sh-nav: 0 -2px 16px 0 rgba(0, 0, 0, 0.06);
+  --sh-top: 0 1px 8px 0 rgba(0, 0, 0, 0.04);
+
+  /* Layout */
+  --app-w: 390px;
+  --topbar-h: 64px;
+  --bottomnav-h: 64px;
+  --gutter: 16px;
+
+  /* Typography */
+  --f-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Malgun Gothic', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur: 180ms;
+
+  /* Z-index */
+  --z-nav: 40;
+  --z-top: 45;
+  --z-sheet: 60;
+  --z-toast: 80;
+}

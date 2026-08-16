@@ -1,0 +1,26 @@
+{
+  "name": "campus-connect-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CampusConnect - 대학 동아리 모집/지원 모바일 앱 (Figma 기반 React 구현)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.26.2"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.0.1",
+    "@vitejs/plugin-react": "4.3.1",
+    "jsdom": "25.0.1",
+    "vite": "5.4.8",
+    "vitest": "2.1.2"
+  }
+}
