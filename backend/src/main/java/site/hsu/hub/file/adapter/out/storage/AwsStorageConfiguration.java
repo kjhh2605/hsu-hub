@@ -1,0 +1,1 @@
+package site.hsu.hub.file.adapter.out.storage; import org.springframework.context.annotation.*; import software.amazon.awssdk.services.s3.S3Client; @Configuration @Profile("prod") class AwsStorageConfiguration{@Bean S3Client s3Client(){return S3Client.create();}}

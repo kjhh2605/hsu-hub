@@ -1,0 +1,1 @@
+package site.hsu.hub.file.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.List;public interface FileCleanupTaskRepository extends JpaRepository<FileCleanupTaskEntity,Long>{List<FileCleanupTaskEntity>findTop20ByOrderByCreatedAtAsc();}

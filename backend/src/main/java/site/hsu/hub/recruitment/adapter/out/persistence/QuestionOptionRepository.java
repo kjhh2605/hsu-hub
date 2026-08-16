@@ -1,0 +1,1 @@
+package site.hsu.hub.recruitment.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.*;public interface QuestionOptionRepository extends JpaRepository<QuestionOptionEntity,Long>{List<QuestionOptionEntity>findByQuestionIdIn(Collection<Long>ids);}

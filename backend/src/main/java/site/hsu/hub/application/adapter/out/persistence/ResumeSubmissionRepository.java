@@ -1,0 +1,1 @@
+package site.hsu.hub.application.adapter.out.persistence;import org.springframework.data.jpa.repository.JpaRepository;import java.util.Optional;public interface ResumeSubmissionRepository extends JpaRepository<ResumeSubmissionEntity,Long>{Optional<ResumeSubmissionEntity>findByApplicationId(Long id);}

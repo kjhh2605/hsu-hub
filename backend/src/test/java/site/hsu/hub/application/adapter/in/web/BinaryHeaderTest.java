@@ -1,0 +1,5 @@
+package site.hsu.hub.application.adapter.in.web;
+import org.junit.jupiter.api.Test;import org.springframework.http.*;import site.hsu.hub.application.application.ApplicationService;import site.hsu.hub.file.api.StoredFile;import static org.assertj.core.api.Assertions.assertThat;import static org.mockito.Mockito.*;
+class BinaryHeaderTest{
+ @Test void resumeIsInlinePrivateAndNosniff(){var service=mock(ApplicationService.class);when(service.resume("public-id")).thenReturn(new StoredFile(1L,"resume.pdf","application/pdf",9,"hash","%PDF-1.7".getBytes()));var response=new OperatorApplicationController(service).resume("public-id");assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PDF);assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).startsWith("inline");assertThat(response.getHeaders().getCacheControl()).contains("no-store");assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");assertThat(response.getHeaders().getFirst("Content-Security-Policy")).contains("sandbox");}
+}

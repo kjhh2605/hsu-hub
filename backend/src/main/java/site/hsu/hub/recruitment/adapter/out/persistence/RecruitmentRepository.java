@@ -1,0 +1,3 @@
+package site.hsu.hub.recruitment.adapter.out.persistence;
+import org.springframework.data.jpa.repository.*;import org.springframework.data.repository.query.Param;import java.time.Instant;import java.util.*;
+public interface RecruitmentRepository extends JpaRepository<RecruitmentEntity,Long>{List<RecruitmentEntity>findByClubIdOrderByPublishedAtDesc(Long clubId);List<RecruitmentEntity>findByClubIdIn(Collection<Long>clubIds);@Query("select count(r)>0 from RecruitmentEntity r where r.clubId=:clubId and r.opensAt<:closes and :opens<r.closesAt")boolean hasOverlap(@Param("clubId")Long clubId,@Param("opens")Instant opens,@Param("closes")Instant closes);}
