@@ -30,7 +30,7 @@ env:
   CDK_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
   OPERATIONS_PRINCIPAL_ARN: ${{ vars.OPERATIONS_PRINCIPAL_ARN }}
   ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
-  SES_PRODUCTION_ACCESS_ACKNOWLEDGED: ${{ vars.SES_PRODUCTION_ACCESS_ACKNOWLEDGED }}
+  KAKAO_SECRET_ARN: ${{ vars.KAKAO_SECRET_ARN }}
   GITHUB_REPOSITORY_CONTEXT: ${{ github.repository }}
   GITHUB_ENVIRONMENT_CONTEXT: production
 
@@ -68,7 +68,7 @@ jobs:
           -c githubEnvironment="$GITHUB_ENVIRONMENT_CONTEXT"
           -c operationsPrincipalArn="$OPERATIONS_PRINCIPAL_ARN"
           -c alertEmail="$ALERT_EMAIL"
-          -c sesProductionAccessAcknowledged="$SES_PRODUCTION_ACCESS_ACKNOWLEDGED"
+          -c kakaoSecretArn="$KAKAO_SECRET_ARN"
       - name: Synthesized IaC security scan
         run: >-
           docker run --rm -v "$PWD:/workspace:ro"
@@ -120,7 +120,7 @@ jobs:
           -c githubEnvironment="$GITHUB_ENVIRONMENT_CONTEXT"
           -c operationsPrincipalArn="$OPERATIONS_PRINCIPAL_ARN"
           -c alertEmail="$ALERT_EMAIL"
-          -c sesProductionAccessAcknowledged="$SES_PRODUCTION_ACCESS_ACKNOWLEDGED"
+          -c kakaoSecretArn="$KAKAO_SECRET_ARN"
       - name: Backend tests
         run: |
           test -x backend/gradlew

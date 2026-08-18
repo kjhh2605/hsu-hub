@@ -22,15 +22,16 @@ aws_cli ecr describe-images --repository-name "$repository_name" \
 deployment_env=$(mktemp)
 payload=$(mktemp)
 trap 'rm -f "$deployment_env" "$payload"' EXIT
-domain_name=${DOMAIN_NAME:-hsu-hub.site}
 cat > "$deployment_env" <<EOF
 AWS_REGION=$AWS_REGION
 REPOSITORY_URI=$repository_uri
 DATABASE_SECRET_ARN=$(stack_output DatabaseSecretArn)
 SESSION_SECRET_ARN=$(stack_output SessionSecretArn)
+KAKAO_SECRET_ARN=$(stack_output KakaoSecretArn)
 SERVICE_DATA_BUCKET=$(stack_output ServiceDataBucketName)
 BACKUP_ROLE_ARN=$(stack_output BackupRoleArn)
-FROM_EMAIL=no-reply@$domain_name
+KAKAO_APPLICANT_ORIGIN=https://hsu-hub.site
+KAKAO_ADMIN_ORIGIN=https://admin.hsu-hub.site
 EOF
 
 compose_b64=$(encode_file "$repo_root/deploy/docker-compose.yml")
