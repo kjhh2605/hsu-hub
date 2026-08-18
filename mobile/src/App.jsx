@@ -1,7 +1,7 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { RequireVerified, NotFound } from './production/Layout.jsx';
-import { ForgotPassword, Login, ResetPassword, Signup, VerifyEmail } from './production/AuthPages.jsx';
+import { RequireAuth, NotFound } from './production/Layout.jsx';
+import { Login } from './production/AuthPages.jsx';
 import Home from './production/Home.jsx';
 import { ClubDetail, ClubList } from './production/Clubs.jsx';
 import { Apply, ApplyDone, ApplyReview } from './production/Application.jsx';
@@ -14,15 +14,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/clubs" element={<RequireVerified><ClubList /></RequireVerified>} />
-          <Route path="/clubs/:clubId" element={<RequireVerified><ClubDetail /></RequireVerified>} />
-          <Route path="/apply/:recruitmentId" element={<RequireVerified><Apply /></RequireVerified>} />
-          <Route path="/apply/:recruitmentId/review" element={<RequireVerified><ApplyReview /></RequireVerified>} />
-          <Route path="/apply/:recruitmentId/done" element={<RequireVerified><ApplyDone /></RequireVerified>} />
+          <Route path="/clubs" element={<RequireAuth><ClubList /></RequireAuth>} />
+          <Route path="/clubs/:clubId" element={<RequireAuth><ClubDetail /></RequireAuth>} />
+          <Route path="/apply/:recruitmentId" element={<RequireAuth><Apply /></RequireAuth>} />
+          <Route path="/apply/:recruitmentId/review" element={<RequireAuth><ApplyReview /></RequireAuth>} />
+          <Route path="/apply/:recruitmentId/done" element={<RequireAuth><ApplyDone /></RequireAuth>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

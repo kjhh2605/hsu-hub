@@ -6,11 +6,11 @@ export function LoadingScreen() {
   return <main className="screen centered" aria-busy="true"><div className="spinner" /><p>불러오는 중이에요</p></main>;
 }
 
-export function RequireVerified({ children }) {
+export function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <LoadingScreen />;
-  if (!user?.emailVerified) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   return children;
 }
 
