@@ -51,12 +51,40 @@ ssm_run_payload() {
     --query Command.CommandId \
     --output text)
 
-  local wait_status=0
-  aws_cli ssm wait command-executed \
-    --command-id "$command_id" --instance-id "$instance_id" || wait_status=$?
+  local timeout_seconds=${SSM_COMMAND_TIMEOUT_SECONDS:-600}
+  [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ ]] || {
+    echo 'SSM_COMMAND_TIMEOUT_SECONDS must be a positive integer' >&2
+    return 2
+  }
+
+  local deadline=$((SECONDS + timeout_seconds))
+  local status='Pending'
+  while (( SECONDS < deadline )); do
+    status=$(aws_cli ssm get-command-invocation \
+      --command-id "$command_id" --instance-id "$instance_id" \
+      --query Status --output text 2>/dev/null) || status='Pending'
+    case "$status" in
+      Success|Cancelled|TimedOut|Failed)
+        break
+        ;;
+      Pending|InProgress|Delayed|Cancelling)
+        sleep 5
+        ;;
+      *)
+        echo "unexpected SSM command status: $status" >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [[ "$status" != Success && "$status" != Cancelled && "$status" != TimedOut && "$status" != Failed ]]; then
+    echo "SSM command did not finish within ${timeout_seconds}s: $command_id" >&2
+    return 1
+  fi
+
   aws_cli ssm get-command-invocation \
     --command-id "$command_id" --instance-id "$instance_id" \
     --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
     --output json
-  return "$wait_status"
+  [[ "$status" == Success ]]
 }

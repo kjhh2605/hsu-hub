@@ -22,6 +22,10 @@ database_username=$(jq -er '.username' <<<"$database_json")
 database_password=$(jq -er '.password' <<<"$database_json")
 session_secret=$(aws --region "$AWS_REGION" secretsmanager get-secret-value \
   --secret-id "$SESSION_SECRET_ARN" --query SecretString --output text)
+kakao_json=$(aws --region "$AWS_REGION" secretsmanager get-secret-value \
+  --secret-id "$KAKAO_SECRET_ARN" --query SecretString --output text)
+kakao_client_id=$(jq -er '.clientId' <<<"$kakao_json")
+kakao_client_secret=$(jq -er '.clientSecret' <<<"$kakao_json")
 
 write_runtime_env() {
   local image=$1
@@ -33,7 +37,10 @@ write_runtime_env() {
     printf 'SESSION_SECRET=%s\n' "$session_secret"
     printf 'AWS_REGION=%s\n' "$AWS_REGION"
     printf 'S3_BUCKET=%s\n' "$SERVICE_DATA_BUCKET"
-    printf 'FROM_EMAIL=%s\n' "$FROM_EMAIL"
+    printf 'KAKAO_CLIENT_ID=%s\n' "$kakao_client_id"
+    printf 'KAKAO_CLIENT_SECRET=%s\n' "$kakao_client_secret"
+    printf 'KAKAO_APPLICANT_ORIGIN=%s\n' "$KAKAO_APPLICANT_ORIGIN"
+    printf 'KAKAO_ADMIN_ORIGIN=%s\n' "$KAKAO_ADMIN_ORIGIN"
   } > "$runtime_env"
 }
 

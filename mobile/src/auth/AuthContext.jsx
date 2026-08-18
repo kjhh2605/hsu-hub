@@ -7,7 +7,7 @@ function normalizeSession(value) {
   if (!value || value.authenticated === false) return null;
   const user = value.user ?? value;
   if (!user?.id && !user?.email) return null;
-  return { ...user, emailVerified: value.emailVerified ?? user.emailVerified ?? true };
+  return user;
 }
 
 export function AuthProvider({ children }) {
@@ -20,12 +20,6 @@ export function AuthProvider({ children }) {
   }, []);
   const value = useMemo(() => ({
     user, loading,
-    async login(credentials) {
-      const result = await api.post('/auth/login', credentials);
-      const session = normalizeSession(result);
-      setUser(session);
-      return session;
-    },
     async logout() { await api.post('/auth/logout'); setUser(null); },
   }), [user, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

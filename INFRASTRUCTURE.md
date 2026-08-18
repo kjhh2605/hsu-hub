@@ -1,8 +1,8 @@
 # HSU Hub production infrastructure
 
-This repository defines the production pilot in TypeScript CDK without performing an AWS deployment. It creates an authoritative Route 53 zone and CloudFront certificate in `us-east-1`, then deploys the application platform in `ap-northeast-2`: a two-AZ VPC with one NAT Gateway, private EC2/SSM compute, encrypted EBS, an internal ALB exposed only through one CloudFront VPC Origin, ECR, three private S3 buckets, SES, Secrets Manager, CloudWatch, alarms, and GitHub OIDC roles.
+This repository defines the production pilot in TypeScript CDK without performing an AWS deployment. It creates an authoritative Route 53 zone and CloudFront certificate in `us-east-1`, then deploys the application platform in `ap-northeast-2`: a two-AZ VPC with one NAT Gateway, private EC2/SSM compute, encrypted EBS, an internal ALB exposed only through two frontend-specific CloudFront VPC Origins, ECR, three private S3 buckets, Secrets Manager, CloudWatch, alarms, and GitHub OIDC roles.
 
-The third S3 bucket is intentionally partitioned by prefix. The backend role can access only `uploads/*` through the S3 gateway endpoint, the backup role is write-only to `backups/*`, and the restore role is read-only to `backups/*`. Access logs use `access-logs/*`; backups and their noncurrent versions expire after 14 days.
+The third S3 bucket is intentionally partitioned by prefix. The backend role can access only `uploads/*` through the S3 gateway endpoint, the backup role is write-only to `backups/*`, and the restore role is read-only to `backups/*`. S3 data-access logs use `access-logs/s3/*`; backups and their noncurrent versions expire after 14 days. CloudFront and ALB request access logs are intentionally disabled because Kakao returns one-time OAuth codes and state in the callback query string, which both services otherwise record verbatim. CloudWatch metrics, rejected VPC flow logs, and query-free application/system logs remain enabled.
 
 ## Required context and external prerequisites
 
@@ -17,7 +17,7 @@ No value below is guessed by CDK. Supply each required context value to `cdk syn
 | `githubEnvironment` | Protected environment, approved as `production` |
 | `operationsPrincipalArn` | Pre-existing IAM operations role in the same account; CDK attaches scoped SSM access and trusts it for restore drills |
 | `alertEmail` | Required monitored address; the SNS subscription must be confirmed |
-| `sesProductionAccessAcknowledged` | Must be `true`, but only after SES production access is approved in `ap-northeast-2` |
+| `kakaoSecretArn` | Complete ARN of the pre-created Kakao credential secret in the production account and `ap-northeast-2` |
 
 Before the first deploy:
 
@@ -32,9 +32,27 @@ Before the first deploy:
 
 4. Make a reviewed one-time deployment with an authorized bootstrap identity. This creates the GitHub OIDC provider and deployment role. Do not attempt to use the pipeline before this step because the pipeline role does not yet exist.
 5. Delegate the registrar nameservers, wait for ACM DNS validation, and verify both CloudFront aliases.
-6. Request SES production access in `ap-northeast-2`, verify that the domain identity is healthy, and confirm that `no-reply@hsu-hub.site` is authorized. CDK cannot approve SES production access.
-7. In the GitHub `production` environment, require human approval and set `AWS_DEPLOY_ROLE_ARN`, `AWS_ACCOUNT_ID`, `OPERATIONS_PRINCIPAL_ARN`, `ALERT_EMAIL`, and `SES_PRODUCTION_ACCESS_ACKNOWLEDGED=true`. Protect `main`; the OIDC trust accepts only `repo:OWNER/REPOSITORY:environment:production`.
-8. Confirm the backend image runs as UID `10001`, exposes port `8080`, writes `/var/log/hsu-hub/application.log`, provides `/actuator/health`, and accepts the environment variables in `deploy/docker-compose.yml`.
+6. In Kakao Developers, create the production application, use its REST API key as `clientId`, activate Kakao Login and the Client Secret, and register these redirect URIs:
+
+   - `https://hsu-hub.site/api/v1/auth/kakao/callback`
+   - `https://admin.hsu-hub.site/api/v1/auth/kakao/callback`
+   - `http://localhost:5173/api/v1/auth/kakao/callback` for the applicant local reverse proxy
+   - `http://127.0.0.1:5174/api/v1/auth/kakao/callback` for the operator local reverse proxy; the distinct host keeps its host-only cookies separate from the applicant app
+
+7. Configure `account_email` as required consent and enable provision after collecting the email through Kakao Account. Complete any Kakao business-app or personal-information review required before production email consent is available.
+8. Publish a privacy policy that states why the Kakao service user ID and email are collected and how long each value is retained.
+9. Pre-create the Kakao credential secret in the production account and `ap-northeast-2`. Its JSON value must contain exactly the runtime keys shown below; CDK imports the secret by complete ARN, creates no value, and grants the instance role read access only to that secret:
+
+   ```json
+   {
+     "clientId": "KAKAO_REST_API_KEY",
+     "clientSecret": "KAKAO_CLIENT_SECRET"
+   }
+   ```
+
+10. In the GitHub `production` environment, require human approval and set `AWS_DEPLOY_ROLE_ARN`, `AWS_ACCOUNT_ID`, `OPERATIONS_PRINCIPAL_ARN`, `ALERT_EMAIL`, and `KAKAO_SECRET_ARN`. `KAKAO_SECRET_ARN` is the complete ARN from the previous step, not either credential value. Protect `main`; the OIDC trust accepts only `repo:OWNER/REPOSITORY:environment:production`.
+11. Confirm the backend image runs as UID `10001`, exposes port `8080`, writes `/var/log/hsu-hub/application.log`, provides `/actuator/health`, and accepts the environment variables in `deploy/docker-compose.yml`.
+12. Before the first Kakao-only release, verify `SELECT COUNT(*) FROM users` is `0` and take the normal pre-deploy backup. Migration V5 deliberately aborts before destructive DDL when any legacy user exists; it is an empty, not-yet-deployed platform cutover and has no automatic rollback path. If the count is nonzero, stop and design an explicit account migration instead of bypassing the guard.
 
 ## Safe validation and first deployment
 
@@ -53,7 +71,7 @@ npm run synth -- --lookups false \
   -c githubEnvironment=production \
   -c operationsPrincipalArn=arn:aws:iam::ACCOUNT_ID:role/HsuHubOperators \
   -c alertEmail=alerts@example.com \
-  -c sesProductionAccessAcknowledged=true
+  -c kakaoSecretArn=arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:/hsu-hub/production/kakao-AbCdEf
 ```
 
 Before an authorized production change, run `cdk diff` for both stacks and review replacements. Stateful resources use retention policies and both stacks have CloudFormation termination protection. The ALB and EC2 instance also use deletion/termination protection, so an intentional teardown requires a separately approved protection change.
@@ -77,11 +95,11 @@ All commands honor `AWS_PROFILE`, `AWS_REGION`, and `PLATFORM_STACK`. Verify the
 
 The systemd timer runs the MySQL dump daily at 18:00 UTC (03:00 KST) with up to 15 minutes of jitter. A release-readiness owner must run `ops/restore-drill.sh` before pilot launch and after any material schema or backup-script change. Record the SSM command ID, backup key, table count, duration, and result in the release evidence. A real production overwrite is deliberately not automated: approve maintenance, take a fresh backup, stop the backend, validate the chosen dump in the drill, restore MySQL under the operations incident procedure, restart the previous compatible image, and run smoke plus application data-integrity checks.
 
-Database and session secret rotation is coordinated rather than automatic. During maintenance, create the replacement value, update Secrets Manager, redeploy the application, verify health and authentication, and invalidate old sessions where appropriate. Database rotation must update MySQL credentials in the same window. Never place secret values in SSM commands, GitHub variables, logs, or Compose source files.
+Database, session, and Kakao credential rotation is coordinated rather than automatic. During maintenance, update the appropriate Secrets Manager value, redeploy the application so the root-only runtime environment is refreshed, verify health and Kakao authentication, and invalidate old HSU Hub sessions where appropriate. Database rotation must update MySQL credentials in the same window; Kakao Client Secret rotation must be coordinated with the Kakao developer application. Keep the existing secret ARN when rotating its value. Never place secret values in SSM commands, GitHub variables, logs, or Compose source files.
 
 ## Monitoring and risks
 
-CloudWatch receives rejected VPC flow logs, application logs, cloud-init logs, EC2 CPU/status metrics, CloudWatch Agent memory/EBS usage, ALB 5xx, and unhealthy-target metrics. The alarm topic is KMS encrypted. Confirm the required alert subscription and test every alarm before launch.
+CloudWatch receives rejected VPC flow logs, application logs, cloud-init logs, EC2 CPU/status metrics, CloudWatch Agent memory/EBS usage, ALB 5xx, and unhealthy-target metrics. The operational alarm topic is KMS encrypted and retains its SNS email subscription; it is unrelated to removed authentication email. Confirm the required alert subscription and test every alarm before launch.
 
 Accepted or pre-launch risks:
 
@@ -90,8 +108,9 @@ Accepted or pre-launch risks:
 - Private-instance internet egress is restricted to TCP 443 through that NAT; DNS is restricted to the VPC resolver and time sync to the Amazon link-local service. The HTTPS destination cannot be IP-allowlisted because AWS/ECR endpoints and OS package mirrors change; add interface endpoints and an egress proxy for stronger destination control.
 - The two distributions have no WAF in this 30-user MVP. Private origin, application rate limits, security headers, and strict authentication are baseline controls; reassess WAF before wider launch.
 - The CloudFront VPC Origin service ENIs use HTTP to the internal-only ALB. Viewer traffic is TLS 1.2+, and this unencrypted hop never leaves the private VPC; use private-origin TLS before the threat model requires in-VPC encryption.
-- All three buckets use SSE-S3 because the centralized bucket receives S3, ALB, and CloudFront access logs with broad service compatibility. Move application data/backups to a dedicated SSE-KMS bucket when the fixed three-bucket constraint is lifted.
-- The centralized third bucket contains data, backups, and access logs under isolated prefixes. Separate logging and backup buckets are the first scale/compliance improvement.
+- All three buckets use SSE-S3 because the centralized bucket receives S3 server-access logs with broad service compatibility. Move application data/backups to a dedicated SSE-KMS bucket when the fixed three-bucket constraint is lifted.
+- The centralized third bucket contains data, backups, and S3 access logs under isolated prefixes. Separate logging and backup buckets are the first scale/compliance improvement.
+- CloudFront and ALB request access logs stay disabled while the OAuth callback transports `code` and `state` in its query string. If request logging is reintroduced, use field-selectable logging that excludes query strings and Referer, and add a release assertion preventing those fields.
 - Restore drills use a 15-minute presigned URL transported as base64 through SSM command history. It expires quickly but should be treated as sensitive operational metadata.
 - CloudFront VPC Origin, NAT Gateway, CloudWatch ingestion, retained EBS/S3 versions, and cross-region custom resources incur cost even at low traffic. Configure budget alarms outside this stack before deployment.
 - OAC and VPC Origin support must be available in the target account/region, and both regions must remain CDK-bootstrapped.

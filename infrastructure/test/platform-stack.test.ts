@@ -16,7 +16,8 @@ const config: HsuHubConfig = {
   githubEnvironment: 'production',
   operationsPrincipalArn: 'arn:aws:iam::123456789012:role/HsuHubOperators',
   alertEmail: 'alerts@example.com',
-  sesProductionAccessAcknowledged: true,
+  kakaoSecretArn:
+    'arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:/hsu-hub/production/kakao-AbCdEf',
 };
 
 function synthesize(): Template {
@@ -80,6 +81,56 @@ describe('PlatformStack', () => {
     });
   });
 
+  it('allows the internal load balancer only from the CloudFront origin-facing prefix list', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::EC2::SecurityGroupIngress', {
+      Description: 'CloudFront origin-facing managed prefix list',
+      FromPort: 80,
+      IpProtocol: 'tcp',
+      SourcePrefixListId: 'pl-22a6434b',
+      ToPort: 80,
+    });
+
+    const loadBalancerGroups = Object.values(template.findResources('AWS::EC2::SecurityGroup'))
+      .filter((resource) => resource.Properties?.GroupDescription ===
+        'CloudFront VPC Origin service ENIs reach the internal ALB');
+    expect(loadBalancerGroups).toHaveLength(1);
+    expect(loadBalancerGroups[0]?.Properties?.SecurityGroupIngress ?? []).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ CidrIp: '10.42.0.0/16' })]),
+    );
+  });
+
+  it('allows CloudWatch Logs to use the data key only for this account log groups', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::KMS::Key', {
+      Description: 'Encrypts HSU Hub secrets and ECR images',
+      KeyPolicy: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith([
+              'kms:Encrypt',
+              'kms:Decrypt',
+              'kms:ReEncrypt*',
+              'kms:GenerateDataKey*',
+              'kms:Describe*',
+            ]),
+            Condition: {
+              ArnLike: {
+                'kms:EncryptionContext:aws:logs:arn':
+                  `arn:aws:logs:${config.region}:${config.account}:log-group:*`,
+              },
+            },
+            Effect: 'Allow',
+            Principal: { Service: `logs.${config.region}.amazonaws.com` },
+            Resource: '*',
+          }),
+        ]),
+      }),
+    });
+  });
+
   it('creates exactly three encrypted private buckets', () => {
     const template = synthesize();
 
@@ -100,7 +151,7 @@ describe('PlatformStack', () => {
 
     template.resourceCountIs('AWS::CloudFront::Distribution', 2);
     template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 2);
-    template.resourceCountIs('AWS::CloudFront::VpcOrigin', 1);
+    template.resourceCountIs('AWS::CloudFront::VpcOrigin', 2);
     template.allResourcesProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
         CacheBehaviors: Match.arrayWith([
@@ -111,6 +162,92 @@ describe('PlatformStack', () => {
         ]),
       }),
     });
+  });
+
+  it('keeps OAuth query secrets out of request logs and referers', () => {
+    const template = synthesize();
+
+    for (const resource of Object.values(template.findResources('AWS::CloudFront::Distribution'))) {
+      const config = resource.Properties?.DistributionConfig;
+      expect(config?.Logging).toBeUndefined();
+    }
+    for (const resource of Object.values(template.findResources('AWS::ElasticLoadBalancingV2::LoadBalancer'))) {
+      const attributes = resource.Properties?.LoadBalancerAttributes ?? [];
+      expect(attributes).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ Key: 'access_logs.s3.enabled', Value: 'true' }),
+      ]));
+    }
+    template.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
+      ResponseHeadersPolicyConfig: Match.objectLike({
+        SecurityHeadersConfig: Match.objectLike({
+          ReferrerPolicy: { ReferrerPolicy: 'no-referrer', Override: true },
+        }),
+      }),
+    });
+  });
+
+  it('renders content security policy through the dedicated CloudFront security header field', () => {
+    const template = synthesize();
+    const policies = Object.values(template.findResources('AWS::CloudFront::ResponseHeadersPolicy'));
+
+    expect(policies).toHaveLength(1);
+    const policyConfig = policies[0]?.Properties?.ResponseHeadersPolicyConfig;
+    expect(policyConfig?.SecurityHeadersConfig?.ContentSecurityPolicy).toEqual({
+      ContentSecurityPolicy:
+        "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+      Override: true,
+    });
+    expect(policyConfig?.CustomHeadersConfig?.Items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ Header: 'Content-Security-Policy' }),
+    ]));
+  });
+
+  it('forwards the CloudFront-generated viewer address for trusted rate limits', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::CloudFront::OriginRequestPolicy', {
+      OriginRequestPolicyConfig: Match.objectLike({
+        HeadersConfig: Match.objectLike({
+          Headers: Match.arrayWith(['CloudFront-Viewer-Address']),
+        }),
+      }),
+    });
+  });
+
+  it('removes SES while granting runtime access only to the configured Kakao secret', () => {
+    const template = synthesize();
+
+    template.resourceCountIs('AWS::SES::EmailIdentity', 0);
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['secretsmanager:GetSecretValue']),
+            Effect: 'Allow',
+            Resource: config.kakaoSecretArn,
+          }),
+        ]),
+      }),
+    });
+    template.hasOutput('KakaoSecretArn', { Value: config.kakaoSecretArn });
+  });
+
+  it('marks each API origin with its trusted frontend identity', () => {
+    const template = synthesize();
+
+    for (const frontend of ['applicant', 'admin']) {
+      template.resourcePropertiesCountIs('AWS::CloudFront::Distribution', {
+        DistributionConfig: Match.objectLike({
+          Origins: Match.arrayWith([
+            Match.objectLike({
+              OriginCustomHeaders: Match.arrayWith([
+                { HeaderName: 'X-HSU-Frontend', HeaderValue: frontend },
+              ]),
+            }),
+          ]),
+        }),
+      }, 1);
+    }
   });
 
   it('retains backup objects for 14 days and enables ECR scanning', () => {
@@ -150,7 +287,14 @@ describe('PlatformStack', () => {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
           Match.objectLike({
+            Action: 's3:GetObject',
+            Principal: { AWS: '*' },
             Resource: 'arn:aws:s3:::prod-ap-northeast-2-starport-layer-bucket/*',
+          }),
+          Match.objectLike({
+            Action: 's3:GetObject',
+            Principal: { AWS: '*' },
+            Resource: 'arn:aws:s3:::al2023-repos-ap-northeast-2-de612dc2/*',
           }),
         ]),
       }),

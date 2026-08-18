@@ -1,2 +1,2 @@
-@org.springframework.modulith.ApplicationModule(allowedDependencies={"common","mail::api"})
+@org.springframework.modulith.ApplicationModule(allowedDependencies={"common"})
 package site.hsu.hub.identity;

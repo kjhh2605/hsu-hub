@@ -197,12 +197,13 @@
 .login-art > div > span { color:#9eb5cd; line-height:1.7; }
 .login-art footer { position:relative; color:#6082a4; font-size:9px; letter-spacing:.15em; }
 .login-panel { display:grid; place-items:center; padding:50px; }
-.login-panel form { width:min(390px,100%); display:grid; gap:18px; }
-.login-panel form > p { margin:0; color:var(--prod-blue); font-size:9px; font-weight:900; letter-spacing:.16em; }
+.login-card { width:min(390px,100%); display:grid; gap:18px; }
+.login-card > p:first-child { margin:0; color:var(--prod-blue); font-size:9px; font-weight:900; letter-spacing:.16em; }
 .login-panel h1 { margin:0; font-size:32px; letter-spacing:-.04em; }
-.login-panel form > span { margin:-10px 0 18px; color:var(--prod-muted); font-size:12px; }
-.login-panel label { display:grid; gap:8px; font-size:11px; font-weight:800; }
-.login-panel input { min-height:48px; padding:0 13px; border:1px solid var(--prod-line); border-radius:9px; }
+.login-card > span { margin:-10px 0 18px; color:var(--prod-muted); font-size:12px; }
+.login-card .kakao-login-button { display:flex; align-items:center; justify-content:center; min-height:48px; padding:0 18px; border-radius:9px; background:#FEE500; color:#191919; font-size:12px; font-weight:900; text-decoration:none; }
+.login-card .kakao-login-button:hover { background:#f4dc00; }
+.login-card .kakao-login-button:focus-visible { outline:3px solid var(--prod-blue); outline-offset:3px; }
 .prod-not-found { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; background:var(--prod-bg); }
 .prod-not-found > span { color:var(--prod-blue); font-size:64px; font-weight:1000; letter-spacing:-.08em; }
 .prod-not-found h1 { margin:5px 0 7px; }

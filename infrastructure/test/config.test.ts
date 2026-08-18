@@ -12,7 +12,8 @@ function configuredApp(overrides: Record<string, string> = {}): App {
       githubEnvironment: 'production',
       operationsPrincipalArn: 'arn:aws:iam::123456789012:role/HsuHubOperators',
       alertEmail: 'alerts@example.com',
-      sesProductionAccessAcknowledged: 'true',
+      kakaoSecretArn:
+        'arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:/hsu-hub/production/kakao-AbCdEf',
       ...overrides,
     },
   });
@@ -69,7 +70,7 @@ describe('loadConfig', () => {
     expect(() => loadConfig(app)).toThrow(/Missing required CDK context: alertEmail/);
   });
 
-  it('blocks synthesis until SES production access is acknowledged', () => {
+  it('requires the pre-created Kakao credential secret ARN', () => {
     const app = new App({
       context: {
         account: '123456789012',
@@ -81,6 +82,20 @@ describe('loadConfig', () => {
         alertEmail: 'alerts@example.com',
       },
     });
-    expect(() => loadConfig(app)).toThrow(/sesProductionAccessAcknowledged must be true/);
+    expect(() => loadConfig(app)).toThrow(/Missing required CDK context: kakaoSecretArn/);
+  });
+
+  it('rejects a Kakao secret from another AWS account', () => {
+    expect(() => loadConfig(configuredApp({
+      kakaoSecretArn:
+        'arn:aws:secretsmanager:ap-northeast-2:999999999999:secret:/hsu-hub/production/kakao-AbCdEf',
+    }))).toThrow(/kakaoSecretArn must be a Secrets Manager secret in account 123456789012 and region ap-northeast-2/);
+  });
+
+  it('rejects a Kakao secret from another AWS region', () => {
+    expect(() => loadConfig(configuredApp({
+      kakaoSecretArn:
+        'arn:aws:secretsmanager:us-east-1:123456789012:secret:/hsu-hub/production/kakao-AbCdEf',
+    }))).toThrow(/kakaoSecretArn must be a Secrets Manager secret in account 123456789012 and region ap-northeast-2/);
   });
 });

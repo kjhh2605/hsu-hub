@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.jsx';
@@ -22,6 +22,13 @@ function renderRoute(route, session = null) {
   return render(<MemoryRouter initialEntries={[route]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
 }
 
+const removedAuthRoutes = [
+  `/${['sign', 'up'].join('')}`,
+  `/${['verify', 'email'].join('-')}`,
+  `/${['forgot', 'password'].join('-')}`,
+  `/${['reset', 'password'].join('-')}`,
+];
+
 describe('applicant production contract', () => {
   it('sends cookies and CSRF on mutations and unwraps ApiResponse', async () => {
     document.cookie = '__Host-XSRF-TOKEN=csrf-value; Path=/; Secure';
@@ -39,10 +46,37 @@ describe('applicant production contract', () => {
     renderRoute('/clubs', null);
     expect(await screen.findByRole('heading', { name: '다시 만나 반가워요' })).toBeInTheDocument();
     expect(screen.getByText('로그인하면 동아리 목록으로 돌아갑니다.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오로 계속하기' })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/kakao/start?returnTo=%2Fclubs',
+    );
   });
 
-  it('allows only the approved route map and returns generic 404 for removed flows', async () => {
-    renderRoute('/applications', { authenticated: true, emailVerified: true, user: { id: 'u1', email: 'u@hansung.ac.kr' } });
+  it('explains when Kakao does not provide a verified email', async () => {
+    renderRoute('/login?error=kakao_email_required', null);
+    expect(await screen.findByRole('alert')).toHaveTextContent('유효하고 인증된 카카오계정 이메일이 필요해요.');
+  });
+
+  it('falls back when router state contains an unsafe destination', async () => {
+    renderRoute({ pathname: '/login', state: { from: '//evil.example' } }, null);
+    expect(await screen.findByRole('link', { name: '카카오로 계속하기' })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/kakao/start?returnTo=%2Fclubs',
+    );
+  });
+
+  it.each(removedAuthRoutes)(
+    'returns generic 404 for removed auth route %s',
+    async (route) => {
+      renderRoute(route, null);
+      expect(await screen.findByRole('heading', { name: '페이지를 찾을 수 없어요' })).toBeInTheDocument();
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument();
+    },
+  );
+
+  it('returns generic 404 for other removed flows', async () => {
+    renderRoute('/applications', { id: 'u1', email: 'u@example.com', role: 'USER' });
     expect(await screen.findByRole('heading', { name: '페이지를 찾을 수 없어요' })).toBeInTheDocument();
   });
 
@@ -52,16 +86,4 @@ describe('applicant production contract', () => {
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/v1/clubs', expect.any(Object)));
   });
 
-  it('offers a non-enumerating verification resend flow', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).includes('/auth/session')) return response({ success: true, data: null });
-      if (String(url).includes('/email-verifications/resend')) return response({ success: true, data: null });
-      throw new Error(`unexpected ${url}`);
-    });
-    render(<MemoryRouter initialEntries={['/verify-email']}><AuthProvider><App /></AuthProvider></MemoryRouter>);
-    const input = await screen.findByLabelText('학교 이메일');
-    fireEvent.change(input, { target: { value: 'student@hansung.ac.kr' } });
-    fireEvent.click(screen.getByRole('button', { name: '인증 메일 다시 받기' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/email-verifications/resend', expect.any(Object)));
-  });
 });

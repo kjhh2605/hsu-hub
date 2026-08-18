@@ -22,15 +22,16 @@ aws_cli ecr describe-images --repository-name "$repository_name" \
 deployment_env=$(mktemp)
 payload=$(mktemp)
 trap 'rm -f "$deployment_env" "$payload"' EXIT
-domain_name=${DOMAIN_NAME:-hsu-hub.site}
 cat > "$deployment_env" <<EOF
 AWS_REGION=$AWS_REGION
 REPOSITORY_URI=$repository_uri
 DATABASE_SECRET_ARN=$(stack_output DatabaseSecretArn)
 SESSION_SECRET_ARN=$(stack_output SessionSecretArn)
+KAKAO_SECRET_ARN=$(stack_output KakaoSecretArn)
 SERVICE_DATA_BUCKET=$(stack_output ServiceDataBucketName)
 BACKUP_ROLE_ARN=$(stack_output BackupRoleArn)
-FROM_EMAIL=no-reply@$domain_name
+KAKAO_APPLICANT_ORIGIN=https://hsu-hub.site
+KAKAO_ADMIN_ORIGIN=https://admin.hsu-hub.site
 EOF
 
 compose_b64=$(encode_file "$repo_root/deploy/docker-compose.yml")
@@ -42,6 +43,16 @@ env_b64=$(encode_file "$deployment_env")
 
 cat > "$payload" <<EOF
 set -euo pipefail
+if ! docker compose version --short 2>/dev/null | grep -Fxq '5.5.0'; then
+  install -d -m 755 /usr/local/lib/docker/cli-plugins
+  curl --fail --location --retry 5 --retry-all-errors \
+    --output /tmp/docker-compose-v5.5.0 \
+    https://github.com/docker/compose/releases/download/v5.5.0/docker-compose-linux-x86_64
+  echo 'c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b  /tmp/docker-compose-v5.5.0' | sha256sum -c -
+  install -m 0755 /tmp/docker-compose-v5.5.0 /usr/local/lib/docker/cli-plugins/docker-compose
+  rm -f /tmp/docker-compose-v5.5.0
+fi
+docker compose version
 install -d -m 750 /opt/hsu-hub /opt/hsu-hub/logs
 chown 10001:10001 /opt/hsu-hub/logs
 printf '%s' '$compose_b64' | base64 -d > /opt/hsu-hub/docker-compose.yml

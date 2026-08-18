@@ -10,13 +10,12 @@ export function OperatorProvider({ children }) {
     setLoading(true);
     try {
       const session = await api.get('/auth/session'); const nextUser = normalizeUser(session);
-      if (!nextUser || (session.emailVerified ?? nextUser.emailVerified ?? true) === false) { setUser(null); setClubs([]); setClubId(null); return; }
+      if (!nextUser) { setUser(null); setClubs([]); setClubId(null); return; }
       setUser(nextUser); const mappings = itemsOf(await api.get('/operator/clubs'), 'clubs'); setClubs(mappings); setClubId((current) => mappings.some((club) => club.id === current) ? current : mappings[0]?.id ?? null);
     } catch { setUser(null); setClubs([]); setClubId(null); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
   const value = useMemo(() => ({ user, clubs, clubId, selectedClub: clubs.find((club) => club.id === clubId), setClubId, loading, refresh: load,
-    async login(credentials) { await api.post('/auth/login', credentials); await load(); },
     async logout() { await api.post('/auth/logout'); setUser(null); setClubs([]); setClubId(null); },
   }), [user, clubs, clubId, loading]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

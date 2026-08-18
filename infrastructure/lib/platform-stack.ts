@@ -24,7 +24,6 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as ses from 'aws-cdk-lib/aws-ses';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import type { Construct } from 'constructs';
@@ -45,8 +44,6 @@ interface FrontendDistributionProps {
   readonly apiOriginRequestPolicy: cloudfront.IOriginRequestPolicy;
   readonly responseHeadersPolicy: cloudfront.IResponseHeadersPolicy;
   readonly rewriteFunction: cloudfront.IFunction;
-  readonly logBucket: s3.IBucket;
-  readonly logPrefix: string;
 }
 
 export class PlatformStack extends Stack {
@@ -60,6 +57,24 @@ export class PlatformStack extends Stack {
       enableKeyRotation: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    dataKey.addToResourcePolicy(new iam.PolicyStatement({
+      sid: 'AllowCloudWatchLogsEncryption',
+      principals: [new iam.ServicePrincipal(`logs.${config.region}.amazonaws.com`)],
+      actions: [
+        'kms:Encrypt',
+        'kms:Decrypt',
+        'kms:ReEncrypt*',
+        'kms:GenerateDataKey*',
+        'kms:Describe*',
+      ],
+      resources: ['*'],
+      conditions: {
+        ArnLike: {
+          'kms:EncryptionContext:aws:logs:arn':
+            `arn:aws:logs:${config.region}:${config.account}:log-group:*`,
+        },
+      },
+    }));
     const alarmKey = new kms.Key(this, 'AlarmKey', {
       alias: 'alias/hsu-hub-alarms',
       enableKeyRotation: true,
@@ -182,6 +197,11 @@ export class PlatformStack extends Stack {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       description: 'Runtime role for the private HSU Hub EC2 instance',
     });
+    const kakaoSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      'KakaoSecret',
+      config.kakaoSecretArn,
+    );
     instanceRole.addToPolicy(new iam.PolicyStatement({
       sid: 'SsmManagedNodeCore',
       actions: [
@@ -224,6 +244,7 @@ export class PlatformStack extends Stack {
     }));
     databaseSecret.grantRead(instanceRole);
     sessionSecret.grantRead(instanceRole);
+    kakaoSecret.grantRead(instanceRole);
     applicationLogGroup.grantWrite(instanceRole);
     systemLogGroup.grantWrite(instanceRole);
     dataKey.grantDecrypt(instanceRole);
@@ -238,13 +259,6 @@ export class PlatformStack extends Stack {
       resources: [serviceDataBucket.bucketArn],
       conditions: { StringLike: { 's3:prefix': ['uploads/*'] } },
     }));
-
-    const emailIdentity = new ses.EmailIdentity(this, 'EmailIdentity', {
-      identity: ses.Identity.publicHostedZone(props.hostedZone),
-      mailFromDomain: `mail.${config.domainName}`,
-      mailFromBehaviorOnMxFailure: ses.MailFromBehaviorOnMxFailure.REJECT_MESSAGE,
-    });
-    emailIdentity.grantSendEmail(instanceRole);
 
     const backupRole = new iam.Role(this, 'BackupRole', {
       assumedBy: new iam.ArnPrincipal(instanceRole.roleArn),
@@ -290,9 +304,14 @@ export class PlatformStack extends Stack {
       resources: [serviceDataBucket.bucketArn, serviceDataBucket.arnForObjects('*')],
     }));
     s3Endpoint.addToPolicy(new iam.PolicyStatement({
-      principals: [new iam.ArnPrincipal(instanceRole.roleArn)],
+      principals: [new iam.AnyPrincipal()],
       actions: ['s3:GetObject'],
       resources: [`arn:aws:s3:::prod-${config.region}-starport-layer-bucket/*`],
+    }));
+    s3Endpoint.addToPolicy(new iam.PolicyStatement({
+      principals: [new iam.AnyPrincipal()],
+      actions: ['s3:GetObject'],
+      resources: [`arn:aws:s3:::al2023-repos-${config.region}-de612dc2/*`],
     }));
     serviceDataBucket.addToResourcePolicy(new iam.PolicyStatement({
       sid: 'UploadsMustUseVpcEndpoint',
@@ -356,7 +375,11 @@ export class PlatformStack extends Stack {
       description: 'CloudFront VPC Origin service ENIs reach the internal ALB',
       allowAllOutbound: false,
     });
-    loadBalancerSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(80), 'CloudFront VPC Origin ENIs');
+    loadBalancerSecurityGroup.addIngressRule(
+      ec2.Peer.prefixList('pl-22a6434b'),
+      ec2.Port.tcp(80),
+      'CloudFront origin-facing managed prefix list',
+    );
     loadBalancerSecurityGroup.addEgressRule(instanceSecurityGroup, ec2.Port.tcp(8080), 'Backend target');
     instanceSecurityGroup.addIngressRule(loadBalancerSecurityGroup, ec2.Port.tcp(8080), 'Internal ALB only');
 
@@ -438,7 +461,6 @@ CWCONFIG`,
       dropInvalidHeaderFields: true,
       deletionProtection: true,
     });
-    loadBalancer.logAccessLogs(serviceDataBucket, 'access-logs/alb');
     const listener = loadBalancer.addListener('HttpListener', { port: 80, open: false });
     const targetGroup = listener.addTargets('BackendTarget', {
       port: 8080,
@@ -452,11 +474,19 @@ CWCONFIG`,
       deregistrationDelay: Duration.seconds(60),
     });
 
-    const apiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
+    const applicantApiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: 80,
       readTimeout: Duration.seconds(60),
       keepaliveTimeout: Duration.seconds(5),
+      customHeaders: { 'X-HSU-Frontend': 'applicant' },
+    });
+    const adminApiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: 80,
+      readTimeout: Duration.seconds(60),
+      keepaliveTimeout: Duration.seconds(5),
+      customHeaders: { 'X-HSU-Frontend': 'admin' },
     });
     const apiOriginRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'ApiOriginRequestPolicy', {
       comment: 'Forward session cookies, CSRF and request metadata to Spring',
@@ -469,19 +499,23 @@ CWCONFIG`,
         'Referer',
         'X-XSRF-TOKEN',
         'X-Request-Id',
+        'CloudFront-Viewer-Address',
       ),
     });
     const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
       securityHeadersBehavior: {
+        contentSecurityPolicy: {
+          contentSecurityPolicy: "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+          override: true,
+        },
         contentTypeOptions: { override: true },
         frameOptions: { frameOption: cloudfront.HeadersFrameOption.SAMEORIGIN, override: true },
-        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
+        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
         strictTransportSecurity: { accessControlMaxAge: Duration.days(365), includeSubdomains: true, preload: true, override: true },
         xssProtection: { protection: true, modeBlock: true, override: true },
       },
       customHeadersBehavior: {
         customHeaders: [
-          { header: 'Content-Security-Policy', value: "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'", override: true },
           { header: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()', override: true },
         ],
       },
@@ -502,24 +536,20 @@ CWCONFIG`,
       hostname: config.applicantHostname,
       bucket: applicantBucket,
       certificate: props.viewerCertificate,
-      apiOrigin,
+      apiOrigin: applicantApiOrigin,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
-      logBucket: serviceDataBucket,
-      logPrefix: 'access-logs/cloudfront/applicant/',
     });
     const adminDistribution = this.frontendDistribution({
       id: 'AdminDistribution',
       hostname: config.adminHostname,
       bucket: adminBucket,
       certificate: props.viewerCertificate,
-      apiOrigin,
+      apiOrigin: adminApiOrigin,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
-      logBucket: serviceDataBucket,
-      logPrefix: 'access-logs/cloudfront/admin/',
     });
 
     for (const [recordId, recordName, distribution] of [
@@ -736,6 +766,10 @@ CWCONFIG`,
       id: 'AwsSolutions-EC23',
       reason: 'The ingress CIDR is the private VPC CIDR token and is required for CloudFront VPC Origin service ENIs; the ALB is internal.',
     });
+    Validations.of(loadBalancer).acknowledge({
+      id: 'AwsSolutions-ELB2',
+      reason: 'ALB access logs preserve the OAuth callback request line including one-time code and state; query-free metrics and application logs remain enabled.',
+    });
     for (const distribution of [applicantDistribution, adminDistribution]) {
       Validations.of(distribution).acknowledge(
         {
@@ -745,6 +779,10 @@ CWCONFIG`,
         {
           id: 'AwsSolutions-CFR2',
           reason: 'WAF is deferred for the 30-user MVP and tracked as a production risk; private origin, rate limits, and security headers provide baseline controls.',
+        },
+        {
+          id: 'AwsSolutions-CFR3',
+          reason: 'Legacy CloudFront logs include OAuth callback query strings; request logs remain disabled until field-selectable logging excludes code, state, and Referer.',
         },
       );
     }
@@ -759,6 +797,7 @@ CWCONFIG`,
       AdminDistributionId: adminDistribution.distributionId,
       DatabaseSecretArn: databaseSecret.secretArn,
       SessionSecretArn: sessionSecret.secretArn,
+      KakaoSecretArn: kakaoSecret.secretArn,
       BackupRoleArn: backupRole.roleArn,
       RestoreRoleArn: restoreRole.roleArn,
       GitHubDeploymentRoleArn: deploymentRole.roleArn,
@@ -795,10 +834,6 @@ CWCONFIG`,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
-      enableLogging: true,
-      logBucket: props.logBucket,
-      logFilePrefix: props.logPrefix,
-      logIncludesCookies: false,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(props.bucket),
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,

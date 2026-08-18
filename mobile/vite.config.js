@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    host: 'localhost',
+    proxy: {
+      '/api': {
+        target: process.env.HSU_BACKEND_ORIGIN || 'http://localhost:8080',
+        headers: { 'X-HSU-Frontend': 'applicant' },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

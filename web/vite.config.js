@@ -10,8 +10,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
-    host: true,
+    port: 5174,
+    host: '127.0.0.1',
+    proxy: {
+      '/api': {
+        target: process.env.HSU_BACKEND_ORIGIN || 'http://localhost:8080',
+        headers: { 'X-HSU-Frontend': 'admin' },
+      },
+    },
   },
   build: {
     rollupOptions: {

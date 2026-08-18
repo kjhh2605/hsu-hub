@@ -6,7 +6,7 @@ import { useOperator } from './OperatorContext';
 export function RequireOperator({ children }) {
   const { user, clubs, loading } = useOperator(); const location = useLocation();
   if (loading) return <div className="prod-loading"><span /><p>운영진 권한을 확인하고 있습니다</p></div>;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   if (!clubs.length) return <div className="prod-empty full"><h1>운영할 수 있는 동아리가 없습니다</h1><p>서비스 관리자에게 운영진 매핑을 요청해 주세요.</p></div>;
   return children;
 }
