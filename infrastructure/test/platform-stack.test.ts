@@ -114,6 +114,40 @@ describe('PlatformStack', () => {
     });
   });
 
+  it('keeps OAuth query secrets out of request logs and referers', () => {
+    const template = synthesize();
+
+    for (const resource of Object.values(template.findResources('AWS::CloudFront::Distribution'))) {
+      const config = resource.Properties?.DistributionConfig;
+      expect(config?.Logging).toBeUndefined();
+    }
+    for (const resource of Object.values(template.findResources('AWS::ElasticLoadBalancingV2::LoadBalancer'))) {
+      const attributes = resource.Properties?.LoadBalancerAttributes ?? [];
+      expect(attributes).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ Key: 'access_logs.s3.enabled', Value: 'true' }),
+      ]));
+    }
+    template.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
+      ResponseHeadersPolicyConfig: Match.objectLike({
+        SecurityHeadersConfig: Match.objectLike({
+          ReferrerPolicy: { ReferrerPolicy: 'no-referrer', Override: true },
+        }),
+      }),
+    });
+  });
+
+  it('forwards the CloudFront-generated viewer address for trusted rate limits', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::CloudFront::OriginRequestPolicy', {
+      OriginRequestPolicyConfig: Match.objectLike({
+        HeadersConfig: Match.objectLike({
+          Headers: Match.arrayWith(['CloudFront-Viewer-Address']),
+        }),
+      }),
+    });
+  });
+
   it('removes SES while granting runtime access only to the configured Kakao secret', () => {
     const template = synthesize();
 

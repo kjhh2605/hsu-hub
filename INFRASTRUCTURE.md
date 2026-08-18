@@ -2,7 +2,7 @@
 
 This repository defines the production pilot in TypeScript CDK without performing an AWS deployment. It creates an authoritative Route 53 zone and CloudFront certificate in `us-east-1`, then deploys the application platform in `ap-northeast-2`: a two-AZ VPC with one NAT Gateway, private EC2/SSM compute, encrypted EBS, an internal ALB exposed only through two frontend-specific CloudFront VPC Origins, ECR, three private S3 buckets, Secrets Manager, CloudWatch, alarms, and GitHub OIDC roles.
 
-The third S3 bucket is intentionally partitioned by prefix. The backend role can access only `uploads/*` through the S3 gateway endpoint, the backup role is write-only to `backups/*`, and the restore role is read-only to `backups/*`. Access logs use `access-logs/*`; backups and their noncurrent versions expire after 14 days.
+The third S3 bucket is intentionally partitioned by prefix. The backend role can access only `uploads/*` through the S3 gateway endpoint, the backup role is write-only to `backups/*`, and the restore role is read-only to `backups/*`. S3 data-access logs use `access-logs/s3/*`; backups and their noncurrent versions expire after 14 days. CloudFront and ALB request access logs are intentionally disabled because Kakao returns one-time OAuth codes and state in the callback query string, which both services otherwise record verbatim. CloudWatch metrics, rejected VPC flow logs, and query-free application/system logs remain enabled.
 
 ## Required context and external prerequisites
 
@@ -52,6 +52,7 @@ Before the first deploy:
 
 10. In the GitHub `production` environment, require human approval and set `AWS_DEPLOY_ROLE_ARN`, `AWS_ACCOUNT_ID`, `OPERATIONS_PRINCIPAL_ARN`, `ALERT_EMAIL`, and `KAKAO_SECRET_ARN`. `KAKAO_SECRET_ARN` is the complete ARN from the previous step, not either credential value. Protect `main`; the OIDC trust accepts only `repo:OWNER/REPOSITORY:environment:production`.
 11. Confirm the backend image runs as UID `10001`, exposes port `8080`, writes `/var/log/hsu-hub/application.log`, provides `/actuator/health`, and accepts the environment variables in `deploy/docker-compose.yml`.
+12. Before the first Kakao-only release, verify `SELECT COUNT(*) FROM users` is `0` and take the normal pre-deploy backup. Migration V5 deliberately aborts before destructive DDL when any legacy user exists; it is an empty, not-yet-deployed platform cutover and has no automatic rollback path. If the count is nonzero, stop and design an explicit account migration instead of bypassing the guard.
 
 ## Safe validation and first deployment
 
@@ -107,8 +108,9 @@ Accepted or pre-launch risks:
 - Private-instance internet egress is restricted to TCP 443 through that NAT; DNS is restricted to the VPC resolver and time sync to the Amazon link-local service. The HTTPS destination cannot be IP-allowlisted because AWS/ECR endpoints and OS package mirrors change; add interface endpoints and an egress proxy for stronger destination control.
 - The two distributions have no WAF in this 30-user MVP. Private origin, application rate limits, security headers, and strict authentication are baseline controls; reassess WAF before wider launch.
 - The CloudFront VPC Origin service ENIs use HTTP to the internal-only ALB. Viewer traffic is TLS 1.2+, and this unencrypted hop never leaves the private VPC; use private-origin TLS before the threat model requires in-VPC encryption.
-- All three buckets use SSE-S3 because the centralized bucket receives S3, ALB, and CloudFront access logs with broad service compatibility. Move application data/backups to a dedicated SSE-KMS bucket when the fixed three-bucket constraint is lifted.
-- The centralized third bucket contains data, backups, and access logs under isolated prefixes. Separate logging and backup buckets are the first scale/compliance improvement.
+- All three buckets use SSE-S3 because the centralized bucket receives S3 server-access logs with broad service compatibility. Move application data/backups to a dedicated SSE-KMS bucket when the fixed three-bucket constraint is lifted.
+- The centralized third bucket contains data, backups, and S3 access logs under isolated prefixes. Separate logging and backup buckets are the first scale/compliance improvement.
+- CloudFront and ALB request access logs stay disabled while the OAuth callback transports `code` and `state` in its query string. If request logging is reintroduced, use field-selectable logging that excludes query strings and Referer, and add a release assertion preventing those fields.
 - Restore drills use a 15-minute presigned URL transported as base64 through SSM command history. It expires quickly but should be treated as sensitive operational metadata.
 - CloudFront VPC Origin, NAT Gateway, CloudWatch ingestion, retained EBS/S3 versions, and cross-region custom resources incur cost even at low traffic. Configure budget alarms outside this stack before deployment.
 - OAC and VPC Origin support must be available in the target account/region, and both regions must remain CDK-bootstrapped.

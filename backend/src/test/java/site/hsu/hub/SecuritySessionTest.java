@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecuritySessionTest {
     private static final String OAUTH_COOKIE = "__Host-HSU_OAUTH";
     private static final URI APPLICANT_CALLBACK = URI.create("https://hsu-hub.site/api/v1/auth/kakao/callback");
+    private static final URI ADMIN_CALLBACK = URI.create("https://admin.hsu-hub.site/api/v1/auth/kakao/callback");
 
     @Autowired MockMvc mvc;
     @MockitoBean KakaoIdentityClient kakao;
@@ -90,6 +91,27 @@ class SecuritySessionTest {
     }
 
     @Test
+    void adminLoginUsesTheIndependentAdminHostCallbackAndSession() throws Exception {
+        Pending pending = start("admin", "/admin/club");
+        when(kakao.exchange(eq("admin-code"), eq(ADMIN_CALLBACK)))
+            .thenReturn(new KakaoIdentity(987654322L, "operator@example.com", true, true));
+
+        MvcResult result = mvc.perform(get("/api/v1/auth/kakao/callback")
+                .header("X-HSU-Frontend", "admin")
+                .cookie(pending.cookie())
+                .param("state", pending.state())
+                .param("code", "admin-code"))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("https://admin.hsu-hub.site/admin/club"))
+            .andReturn();
+
+        assertThat(result.getResponse().getHeaders("Set-Cookie"))
+            .anySatisfy(cookie -> assertThat(cookie)
+                .contains("__Host-HSU_SESSION=")
+                .doesNotContain("Domain="));
+    }
+
+    @Test
     void providerDenialExpiresStateAndRedirectsToCancelledError() throws Exception {
         Pending pending = start("/clubs");
 
@@ -124,8 +146,12 @@ class SecuritySessionTest {
     }
 
     private Pending start(String returnTo) throws Exception {
+        return start("applicant", returnTo);
+    }
+
+    private Pending start(String frontend, String returnTo) throws Exception {
         MvcResult result = mvc.perform(get("/api/v1/auth/kakao/start")
-                .header("X-HSU-Frontend", "applicant")
+                .header("X-HSU-Frontend", frontend)
                 .param("returnTo", returnTo))
             .andExpect(status().isFound())
             .andReturn();

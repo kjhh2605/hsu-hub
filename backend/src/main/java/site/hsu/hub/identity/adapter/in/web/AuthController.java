@@ -57,7 +57,7 @@ public class AuthController implements AuthControllerDocs {
         HttpServletRequest request,
         HttpServletResponse response
     ) {
-        rate.check("kakao-start:ip:" + ip(request), 20, Duration.ofMinutes(10));
+        rate.check("kakao-start:ip:" + clientIp(request), 20, Duration.ofMinutes(10));
         URI callback = callbackUri(request.getHeader(FRONTEND_HEADER));
         OAuthStateCodec.PendingLogin pending = states.issue(returnTo);
         response.addHeader("Set-Cookie", oauthCookie(pending.cookieValue(), 300).toString());
@@ -86,14 +86,14 @@ public class AuthController implements AuthControllerDocs {
         response.addHeader("Set-Cookie", oauthCookie("", 0).toString());
         URI origin = frontendOrigin(request.getHeader(FRONTEND_HEADER));
         try {
-            rate.check("kakao-callback:ip:" + ip(request), 30, Duration.ofMinutes(10));
+            rate.check("kakao-callback:ip:" + clientIp(request), 30, Duration.ofMinutes(10));
             OAuthStateCodec.PendingLogin pending = states.verify(oauthCookie, state);
             if (error != null && !error.isBlank()) {
                 redirect(response, origin.resolve("/login?error=kakao_cancelled"));
                 return;
             }
             if (code == null || code.isBlank()) throw new ApiException(ErrorCode.BAD_REQUEST);
-            var result = auth.loginWithKakao(code, callbackUri(origin), ip(request));
+            var result = auth.loginWithKakao(code, callbackUri(origin), clientIp(request));
             response.addHeader("Set-Cookie", sessionCookie(result.rawSession(), 7 * 24 * 60 * 60).toString());
             redirect(response, origin.resolve(pending.returnTo()));
         } catch (ApiException exception) {
@@ -161,9 +161,49 @@ public class AuthController implements AuthControllerDocs {
         response.setHeader("Location", target.toASCIIString());
     }
 
-    private static String ip(HttpServletRequest request) {
-        String forwarded = request.getHeader("CloudFront-Viewer-Address");
-        return forwarded == null ? request.getRemoteAddr() : forwarded.split(":")[0];
+    static String clientIp(HttpServletRequest request) {
+        String viewerAddress = request.getHeader("CloudFront-Viewer-Address");
+        if (viewerAddress == null || viewerAddress.isBlank()) return request.getRemoteAddr();
+
+        String address;
+        String port;
+        if (viewerAddress.startsWith("[")) {
+            int closingBracket = viewerAddress.indexOf(']');
+            if (closingBracket < 2 || closingBracket + 1 >= viewerAddress.length()
+                || viewerAddress.charAt(closingBracket + 1) != ':') return request.getRemoteAddr();
+            address = viewerAddress.substring(1, closingBracket);
+            port = viewerAddress.substring(closingBracket + 2);
+        } else {
+            int separator = viewerAddress.lastIndexOf(':');
+            if (separator <= 0 || separator == viewerAddress.length() - 1) return request.getRemoteAddr();
+            address = viewerAddress.substring(0, separator);
+            port = viewerAddress.substring(separator + 1);
+        }
+        return validAddress(address) && validPort(port) ? address : request.getRemoteAddr();
+    }
+
+    private static boolean validAddress(String address) {
+        if (address.indexOf(':') >= 0) return address.matches("[0-9A-Fa-f:]+");
+        String[] octets = address.split("\\.", -1);
+        if (octets.length != 4) return false;
+        for (String octet : octets) {
+            try {
+                int value = Integer.parseInt(octet);
+                if (value < 0 || value > 255) return false;
+            } catch (NumberFormatException exception) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean validPort(String port) {
+        try {
+            int value = Integer.parseInt(port);
+            return value > 0 && value <= 65535;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     public record SessionResponse(Long id, String email, String role) {

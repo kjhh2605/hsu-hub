@@ -10,14 +10,32 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class OAuthStateCodec {
     private static final String DEFAULT_RETURN_TO = "/clubs";
+    private static final Duration STATE_TTL = Duration.ofMinutes(5);
+    private final Clock clock;
+    private final ConcurrentHashMap<String, Instant> issuedStates = new ConcurrentHashMap<>();
+
+    public OAuthStateCodec() {
+        this(Clock.systemUTC());
+    }
+
+    OAuthStateCodec(Clock clock) {
+        this.clock = clock;
+    }
 
     public PendingLogin issue(String rawReturnTo) {
+        Instant now = clock.instant();
+        issuedStates.entrySet().removeIf(entry -> !now.isBefore(entry.getValue()));
         String state = TokenSupport.newRawToken();
+        issuedStates.put(TokenSupport.sha256(state), now.plus(STATE_TTL));
         String returnTo = safeReturnTo(rawReturnTo);
         String cookieValue = Base64.getUrlEncoder().withoutPadding()
             .encodeToString((state + "\n" + returnTo).getBytes(StandardCharsets.UTF_8));
@@ -31,7 +49,9 @@ public class OAuthStateCodec {
             if (separator <= 0 || separator != decoded.lastIndexOf('\n')) throw invalidState();
             String expectedState = decoded.substring(0, separator);
             String returnTo = decoded.substring(separator + 1);
-            if (returnedState == null || !MessageDigest.isEqual(
+            Instant expiresAt = issuedStates.remove(TokenSupport.sha256(expectedState));
+            if (expiresAt == null || TokenSupport.isExpired(expiresAt, clock.instant())
+                || returnedState == null || !MessageDigest.isEqual(
                 expectedState.getBytes(StandardCharsets.UTF_8),
                 returnedState.getBytes(StandardCharsets.UTF_8)
             )) {

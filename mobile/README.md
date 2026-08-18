@@ -1,14 +1,14 @@
 # CampusConnect Mobile
 
-Figma `CampusConnect` 앱뷰(390px 모바일 화면 전체)를 React 로 구현한 프로토타입입니다.
-더미 데이터가 내장되어 있어 백엔드 없이 실제 사용자 흐름을 그대로 눌러볼 수 있습니다.
+Figma `CampusConnect` 앱뷰(390px 모바일 화면 전체)를 React로 구현한 지원자 웹앱입니다.
+운영 인증은 카카오 로그인만 사용하며 `/api` 요청은 HSU Hub 백엔드로 전달됩니다.
 
 ## 실행
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 71개 테스트 (비즈니스 로직 33 + 화면/라우팅 38)
+npm test
 npm run build
 ```
 
@@ -18,7 +18,7 @@ npm run build
 
 | 라우트 | 화면 | Figma 프레임 |
 | --- | --- | --- |
-| `/login` | 로그인 (카카오/구글/애플) | 로그인 (MVP) |
+| `/login` | 카카오 로그인 | 로그인 (MVP) |
 | `/onboarding` | 기본 프로필 등록 | 기본 프로필 등록 (MVP) |
 | `/explore` | 동아리 탐색 (검색·카테고리) | 하단 탭 `탐색` |
 | `/clubs/:clubId` | 동아리 상세 (혜택/일정/FAQ) | 동아리 상세 정보 (고도화) |

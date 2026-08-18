@@ -44,8 +44,6 @@ interface FrontendDistributionProps {
   readonly apiOriginRequestPolicy: cloudfront.IOriginRequestPolicy;
   readonly responseHeadersPolicy: cloudfront.IResponseHeadersPolicy;
   readonly rewriteFunction: cloudfront.IFunction;
-  readonly logBucket: s3.IBucket;
-  readonly logPrefix: string;
 }
 
 export class PlatformStack extends Stack {
@@ -436,7 +434,6 @@ CWCONFIG`,
       dropInvalidHeaderFields: true,
       deletionProtection: true,
     });
-    loadBalancer.logAccessLogs(serviceDataBucket, 'access-logs/alb');
     const listener = loadBalancer.addListener('HttpListener', { port: 80, open: false });
     const targetGroup = listener.addTargets('BackendTarget', {
       port: 8080,
@@ -475,13 +472,14 @@ CWCONFIG`,
         'Referer',
         'X-XSRF-TOKEN',
         'X-Request-Id',
+        'CloudFront-Viewer-Address',
       ),
     });
     const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
       securityHeadersBehavior: {
         contentTypeOptions: { override: true },
         frameOptions: { frameOption: cloudfront.HeadersFrameOption.SAMEORIGIN, override: true },
-        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
+        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
         strictTransportSecurity: { accessControlMaxAge: Duration.days(365), includeSubdomains: true, preload: true, override: true },
         xssProtection: { protection: true, modeBlock: true, override: true },
       },
@@ -512,8 +510,6 @@ CWCONFIG`,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
-      logBucket: serviceDataBucket,
-      logPrefix: 'access-logs/cloudfront/applicant/',
     });
     const adminDistribution = this.frontendDistribution({
       id: 'AdminDistribution',
@@ -524,8 +520,6 @@ CWCONFIG`,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
-      logBucket: serviceDataBucket,
-      logPrefix: 'access-logs/cloudfront/admin/',
     });
 
     for (const [recordId, recordName, distribution] of [
@@ -742,6 +736,10 @@ CWCONFIG`,
       id: 'AwsSolutions-EC23',
       reason: 'The ingress CIDR is the private VPC CIDR token and is required for CloudFront VPC Origin service ENIs; the ALB is internal.',
     });
+    Validations.of(loadBalancer).acknowledge({
+      id: 'AwsSolutions-ELB2',
+      reason: 'ALB access logs preserve the OAuth callback request line including one-time code and state; query-free metrics and application logs remain enabled.',
+    });
     for (const distribution of [applicantDistribution, adminDistribution]) {
       Validations.of(distribution).acknowledge(
         {
@@ -751,6 +749,10 @@ CWCONFIG`,
         {
           id: 'AwsSolutions-CFR2',
           reason: 'WAF is deferred for the 30-user MVP and tracked as a production risk; private origin, rate limits, and security headers provide baseline controls.',
+        },
+        {
+          id: 'AwsSolutions-CFR3',
+          reason: 'Legacy CloudFront logs include OAuth callback query strings; request logs remain disabled until field-selectable logging excludes code, state, and Referer.',
         },
       );
     }
@@ -802,10 +804,6 @@ CWCONFIG`,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
-      enableLogging: true,
-      logBucket: props.logBucket,
-      logFilePrefix: props.logPrefix,
-      logIncludesCookies: false,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(props.bucket),
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,

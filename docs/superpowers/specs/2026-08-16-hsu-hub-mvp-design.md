@@ -1,7 +1,7 @@
 # HSU Hub MVP Design
 
 **Date:** 2026-08-16
-**Status:** Approved design
+**Status:** Superseded for authentication by [2026-08-18-kakao-auth-design.md](./2026-08-18-kakao-auth-design.md); non-authentication scope remains applicable
 **Domains:** `hsu-hub.site`, `admin.hsu-hub.site`
 
 ## 1. Purpose

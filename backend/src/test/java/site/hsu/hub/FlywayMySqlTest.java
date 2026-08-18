@@ -1,6 +1,7 @@
 package site.hsu.hub;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -12,6 +13,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayMySqlTest {
@@ -23,11 +25,47 @@ class FlywayMySqlTest {
 
     @Test
     void migrationsCreateTheKakaoUserSchemaWithoutLegacyAuthenticationArtifacts() throws Exception {
-        var result = Flyway.configure()
+        Flyway legacy = Flyway.configure()
             .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
             .locations("classpath:db/migration")
-            .load()
-            .migrate();
+            .target(MigrationVersion.fromVersion("4"))
+            .load();
+        legacy.migrate();
+
+        try (Connection connection = DriverManager.getConnection(
+            MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                insert into users (
+                    email_normalized, password_hash, email_verified_at,
+                    service_role, status, created_at, updated_at
+                ) values (
+                    'legacy@example.com', 'legacy-hash', current_timestamp(6),
+                    'APPLICANT', 'ACTIVE', current_timestamp(6), current_timestamp(6)
+                )
+                """);
+        }
+
+        Flyway latest = Flyway.configure()
+            .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
+            .locations("classpath:db/migration")
+            .cleanDisabled(false)
+            .load();
+        assertThatThrownBy(latest::migrate).hasMessageContaining("V5__replace_email_auth_with_kakao.sql");
+        try (Connection connection = DriverManager.getConnection(
+            MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())) {
+            assertThat(queryNames(connection,
+                "select column_name from information_schema.columns " +
+                    "where table_schema = database() and table_name = 'users'"))
+                .contains("password_hash", "email_verified_at", "email_normalized")
+                .doesNotContain("kakao_user_id");
+            assertThat(queryNames(connection,
+                "select table_name from information_schema.tables where table_schema = database()"))
+                .contains("email_verification_tokens", "password_reset_tokens");
+        }
+
+        latest.clean();
+        var result = latest.migrate();
 
         assertThat(result.migrationsExecuted).isEqualTo(5);
         try (Connection connection = DriverManager.getConnection(
