@@ -41,6 +41,14 @@ springdoc:
 hsu:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://hsu-hub.site,https://admin.hsu-hub.site}
+  kakao:
+    client-id: ${HSU_KAKAO_CLIENT_ID}
+    client-secret: ${HSU_KAKAO_CLIENT_SECRET}
+    authorize-uri: https://kauth.kakao.com/oauth/authorize
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+    applicant-origin: ${HSU_KAKAO_APPLICANT_ORIGIN:https://hsu-hub.site}
+    admin-origin: ${HSU_KAKAO_ADMIN_ORIGIN:https://admin.hsu-hub.site}
 
 ---
 spring:
