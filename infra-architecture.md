@@ -61,6 +61,8 @@ flowchart LR
 | `HsuHubDnsCertificate` | `us-east-1` | `CREATE_COMPLETE` | 활성 | Route 53 Hosted Zone, ACM 인증서, 교차 리전 값 전달 |
 | `HsuHubPlatform` | `ap-northeast-2` | `UPDATE_COMPLETE` | 활성 | 네트워크, 컴퓨팅, 스토리지, CDN, IAM, 관측성, DNS 레코드 |
 
+2026-08-18에 두 스택 모두 CloudFormation drift detection을 다시 실행했으며 `IN_SYNC`, drift resource 0개로 확인됐다.
+
 두 스택에는 `Application=hsu-hub`, `Environment=production`, `ManagedBy=aws-cdk` 태그가 적용된다. Hosted Zone, 인증서, KMS 키, 로그 그룹, ECR, S3와 데이터 EBS 등 데이터 보존이 필요한 자원은 삭제 정책이 `RETAIN`이다.
 
 CDK 컨텍스트로 다음 값을 반드시 받는다.
@@ -134,7 +136,7 @@ CDK 컨텍스트로 다음 값을 반드시 받는다.
 | 지역 제한 | 없음 |
 | WAF | 없음 |
 
-보안 헤더 정책은 HSTS 365일(`includeSubDomains`, preload), `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, XSS protection과 카메라·마이크·위치정보를 막는 `Permissions-Policy`를 설정한다. 정적 콘텐츠 CSP는 `default-src 'self'`를 기준으로 이미지의 `data:`/`blob:`, 필요한 API·스타일·폰트 연결만 허용한다. 백엔드 응답도 별도의 Spring Security 헤더 정책을 적용한다.
+보안 헤더 정책은 HSTS 365일(`includeSubDomains`, preload), `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, XSS protection과 카메라·마이크·위치정보를 막는 `Permissions-Policy`를 설정한다. CloudFront CSP는 `default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`다. 백엔드 응답도 별도의 Spring Security 헤더 정책을 적용한다.
 
 CloudFront 및 ALB 액세스 로그는 OAuth `code`와 `state`가 쿼리 문자열에 남는 위험을 피하기 위해 의도적으로 비활성화했다. 정적 S3 서버 액세스 로그는 ServiceData 버킷에 보관한다.
 
@@ -160,17 +162,20 @@ CloudFront 및 ALB 액세스 로그는 OAuth `code`와 `state`가 쿼리 문자�
 
 | 유형 | AZ | CIDR | Subnet ID | 기본 경로 |
 |---|---|---|---|---|
-| Public | `2a` | `10.42.0.0/24` | `subnet-0059c39731a5576e2` | Internet Gateway |
-| Public | `2c` | `10.42.1.0/24` | `subnet-0f720c83fb6fdb63a` | Internet Gateway |
+| Public | `2a` | `10.42.0.0/24` | `subnet-0059fd594efdf4971` | Internet Gateway |
+| Public | `2c` | `10.42.1.0/24` | `subnet-0f720bf1ed711083c` | Internet Gateway |
 | Application private | `2a` | `10.42.2.0/24` | `subnet-04b2acc5dcde7468b` | 단일 NAT Gateway + S3 endpoint |
-| Application private | `2c` | `10.42.3.0/24` | `subnet-0a3c0142fda2d18af` | 단일 NAT Gateway + S3 endpoint |
+| Application private | `2c` | `10.42.3.0/24` | `subnet-0a3d69edec17cf57a` | 단일 NAT Gateway + S3 endpoint |
 
 서브넷은 모두 `MapPublicIpOnLaunch=false`다. Public 서브넷은 인터넷 경로를 갖지만 인스턴스에 자동 퍼블릭 IP를 부여하지 않는다.
 
+각 서브넷의 명시적 route table은 Public `2a`=`rtb-0cf931cc7891f57b3`, Public `2c`=`rtb-0fba483e9781653c9`, Application `2a`=`rtb-0525849d217b5eed7`, Application `2c`=`rtb-0cd0823cb66071eed`다. VPC에는 local route만 가진 암시적 main route table `rtb-02c524bf64ba7870c`도 있다. Internet Gateway는 `igw-0abbbc595c8f0bd37`이다.
+
 ### 5.2 인터넷 송신
 
-- NAT Gateway: `nat-085d...` (Public `2a` 서브넷)
+- NAT Gateway: `nat-085d966a22a37b895` (Public `2a` 서브넷)
 - Elastic IP: `43.200.226.26`
+- EIP allocation: `eipalloc-0400a89fc33e5db86`
 - NAT 사설 IP: `10.42.0.15`
 - 두 private 서브넷이 하나의 NAT를 공유하므로 NAT와 해당 AZ 장애에 대한 다중 AZ 송신 이중화는 없다.
 
@@ -193,8 +198,10 @@ ServiceData의 업로드/백업 객체에는 버킷 정책으로 이 endpoint �
 
 | 보안 그룹 | Ingress | Egress |
 |---|---|---|
-| ALB `sg-07f...` | AWS CloudFront origin-facing managed prefix list에서 TCP 80 | Instance SG로 TCP 8080만 |
+| CloudFront VPC Origin service `sg-02fc1e238f9bec2b6` | 없음 | AWS 관리 SG로 모든 egress; CloudFront service ENI가 관리 |
+| ALB `sg-07f16c64cdcaa8b11` | AWS CloudFront origin-facing managed prefix list `pl-22a6434b`에서 TCP 80 | Instance SG로 TCP 8080만 |
 | Instance `sg-04ab7b821dc0a797b` | ALB SG에서 TCP 8080만 | 인터넷 TCP 443, `10.42.0.2/32` TCP/UDP 53, `169.254.169.123/32` UDP 123 |
+| VPC default `sg-0bfc0102b02bb6e2b` | 없음 | 없음 |
 
 SSH(22), MySQL(3306), 애플리케이션(8080)의 인터넷 직접 ingress는 없다. MySQL은 호스트 포트도 publish하지 않는다.
 
@@ -202,6 +209,9 @@ SSH(22), MySQL(3306), 애플리케이션(8080)의 인터넷 직접 ingress는 �
 
 - 종류: Application Load Balancer
 - Scheme: `internal`
+- 이름: `HsuHub-Inter-E0XjZQQ28taz`
+- ARN: `arn:aws:elasticloadbalancing:ap-northeast-2:004376454721:loadbalancer/app/HsuHub-Inter-E0XjZQQ28taz/f3faf73b0830e205`
+- DNS: `internal-HsuHub-Inter-E0XjZQQ28taz-181200579.ap-northeast-2.elb.amazonaws.com`
 - 주소 유형: IPv4
 - 배치: 두 Application private 서브넷
 - Listener: HTTP 80
