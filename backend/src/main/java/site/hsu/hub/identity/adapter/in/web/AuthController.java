@@ -2,15 +2,10 @@ package site.hsu.hub.identity.adapter.in.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -110,39 +105,6 @@ public class AuthController implements AuthControllerDocs {
     }
 
     @Override
-    @PostMapping("/signup")
-    public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest body, HttpServletRequest request) {
-        auth.signup(body.email(), body.password(), ip(request));
-        return Responses.ok(null, request);
-    }
-
-    @Override
-    @PostMapping("/email-verifications/resend")
-    public ApiResponse<Void> resend(@Valid @RequestBody EmailRequest body, HttpServletRequest request) {
-        auth.resend(body.email(), ip(request));
-        return Responses.ok(null, request);
-    }
-
-    @Override
-    @PostMapping("/email-verifications/confirm")
-    public ApiResponse<Void> confirmEmail(@Valid @RequestBody TokenRequest body, HttpServletRequest request) {
-        auth.confirmEmail(body.token());
-        return Responses.ok(null, request);
-    }
-
-    @Override
-    @PostMapping("/login")
-    public ApiResponse<SessionResponse> login(
-        @Valid @RequestBody LoginRequest body,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
-        var result = auth.login(body.email(), body.password(), ip(request));
-        response.addHeader("Set-Cookie", sessionCookie(result.rawSession(), 7 * 24 * 60 * 60).toString());
-        return Responses.ok(SessionResponse.from(result.user()), request);
-    }
-
-    @Override
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
         @CookieValue(name = SESSION_COOKIE, required = false) String session,
@@ -151,20 +113,6 @@ public class AuthController implements AuthControllerDocs {
     ) {
         auth.logout(session);
         response.addHeader("Set-Cookie", sessionCookie("", 0).toString());
-        return Responses.ok(null, request);
-    }
-
-    @Override
-    @PostMapping("/password-resets/request")
-    public ApiResponse<Void> requestReset(@Valid @RequestBody EmailRequest body, HttpServletRequest request) {
-        auth.requestReset(body.email(), ip(request));
-        return Responses.ok(null, request);
-    }
-
-    @Override
-    @PostMapping("/password-resets/confirm")
-    public ApiResponse<Void> confirmReset(@Valid @RequestBody ResetConfirmRequest body, HttpServletRequest request) {
-        auth.confirmReset(body.token(), body.password());
         return Responses.ok(null, request);
     }
 
@@ -218,11 +166,6 @@ public class AuthController implements AuthControllerDocs {
         return forwarded == null ? request.getRemoteAddr() : forwarded.split(":")[0];
     }
 
-    public record SignupRequest(@Email @NotBlank String email, @NotBlank @Size(min = 10, max = 200) String password) {}
-    public record LoginRequest(@Email @NotBlank String email, @NotBlank String password) {}
-    public record EmailRequest(@Email @NotBlank String email) {}
-    public record TokenRequest(@NotBlank String token) {}
-    public record ResetConfirmRequest(@NotBlank String token, @NotBlank @Size(min = 10, max = 200) String password) {}
     public record SessionResponse(Long id, String email, String role) {
         static SessionResponse from(SessionUser user) {
             return new SessionResponse(user.id(), user.email(), user.role().name());

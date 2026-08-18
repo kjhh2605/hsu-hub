@@ -1,16 +1,103 @@
 package site.hsu.hub.identity.adapter.in.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper; import jakarta.servlet.http.*; import org.springframework.beans.factory.annotation.Value; import org.springframework.context.annotation.*; import org.springframework.http.HttpMethod; import org.springframework.http.MediaType; import org.springframework.security.config.annotation.web.builders.HttpSecurity; import org.springframework.security.config.http.SessionCreationPolicy; import org.springframework.security.crypto.argon2.Argon2PasswordEncoder; import org.springframework.security.crypto.password.PasswordEncoder; import org.springframework.security.web.SecurityFilterChain; import org.springframework.security.web.authentication.AnonymousAuthenticationFilter; import org.springframework.security.web.csrf.CookieCsrfTokenRepository; import org.springframework.security.web.csrf.CsrfToken; import org.springframework.web.cors.*; import org.springframework.web.filter.OncePerRequestFilter; import site.hsu.hub.common.api.*; import site.hsu.hub.common.exception.ErrorCode;
-import java.io.IOException; import java.time.Instant; import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+import site.hsu.hub.common.api.ApiResponse;
+import site.hsu.hub.common.api.RequestIdFilter;
+import site.hsu.hub.common.exception.ErrorCode;
 
-@Configuration public class SecurityConfiguration {
- @Bean PasswordEncoder passwordEncoder(){return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();}
- @Bean CorsConfigurationSource corsConfigurationSource(@Value("${hsu.cors.allowed-origins}")String origins){var c=new CorsConfiguration();c.setAllowedOrigins(java.util.Arrays.stream(origins.split(",")).map(String::trim).toList());c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));c.setAllowedHeaders(List.of("Content-Type","X-XSRF-TOKEN","Idempotency-Key"));c.setExposedHeaders(List.of("X-Request-ID","Content-Disposition"));c.setAllowCredentials(true);c.setMaxAge(3600L);var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/api/**",c);return source;}
- @Bean SecurityFilterChain filterChain(HttpSecurity http,SessionAuthenticationFilter session,ObjectMapper mapper)throws Exception{
-  var csrf=CookieCsrfTokenRepository.withHttpOnlyFalse(); csrf.setCookieName("__Host-XSRF-TOKEN");csrf.setHeaderName("X-XSRF-TOKEN");csrf.setCookieCustomizer(c->c.secure(true).path("/").sameSite("Lax"));
-  http.sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).csrf(c->c.csrfTokenRepository(csrf)).cors(c->{}).authorizeHttpRequests(a->a.requestMatchers(HttpMethod.GET,"/api/v1/auth/kakao/start","/api/v1/auth/kakao/callback").permitAll().requestMatchers("/actuator/health","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html","/api/v1/auth/signup","/api/v1/auth/login","/api/v1/auth/email-verifications/**","/api/v1/auth/password-resets/**").permitAll().anyRequest().authenticated()).addFilterBefore(session, AnonymousAuthenticationFilter.class).addFilterAfter(new CsrfCookieFilter(),SessionAuthenticationFilter.class).exceptionHandling(e->e.authenticationEntryPoint((req,res,ex)->write(mapper,req,res,ErrorCode.UNAUTHORIZED)).accessDeniedHandler((req,res,ex)->write(mapper,req,res,ErrorCode.FORBIDDEN))).headers(h->h.httpStrictTransportSecurity(x->x.includeSubDomains(true).maxAgeInSeconds(31536000)).frameOptions(x->x.sameOrigin()).contentTypeOptions(x->{}).referrerPolicy(x->x.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)).contentSecurityPolicy(x->x.policyDirectives("default-src 'none'; frame-ancestors 'self'; form-action 'self'")));
-  return http.build();
- }
- private static void write(ObjectMapper mapper,HttpServletRequest req,HttpServletResponse res,ErrorCode code)throws IOException{res.setStatus(code.status().value());res.setContentType(MediaType.APPLICATION_JSON_VALUE);String id=(String)req.getAttribute(RequestIdFilter.REQUEST_ID);mapper.writeValue(res.getOutputStream(),ApiResponse.error(code.name(),code.message(),List.of(),id));}
- static class CsrfCookieFilter extends OncePerRequestFilter {protected void doFilterInternal(HttpServletRequest req,HttpServletResponse res,jakarta.servlet.FilterChain chain)throws jakarta.servlet.ServletException,IOException{CsrfToken token=(CsrfToken)req.getAttribute(CsrfToken.class.getName());if(token!=null)token.getToken();chain.doFilter(req,res);}}
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+public class SecurityConfiguration {
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(@Value("${hsu.cors.allowed-origins}") String origins) {
+        var configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).toList());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Idempotency-Key"));
+        configuration.setExposedHeaders(List.of("X-Request-ID", "Content-Disposition"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
+    }
+
+    @Bean
+    SecurityFilterChain filterChain(
+        HttpSecurity http,
+        SessionAuthenticationFilter session,
+        ObjectMapper mapper
+    ) throws Exception {
+        var csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrf.setCookieName("__Host-XSRF-TOKEN");
+        csrf.setHeaderName("X-XSRF-TOKEN");
+        csrf.setCookieCustomizer(cookie -> cookie.secure(true).path("/").sameSite("Lax"));
+        http
+            .sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(configuration -> configuration.csrfTokenRepository(csrf))
+            .cors(configuration -> {})
+            .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/kakao/start", "/api/v1/auth/kakao/callback").permitAll()
+                .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .anyRequest().authenticated())
+            .addFilterBefore(session, AnonymousAuthenticationFilter.class)
+            .addFilterAfter(new CsrfCookieFilter(), SessionAuthenticationFilter.class)
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, exception) -> write(mapper, request, response, ErrorCode.UNAUTHORIZED))
+                .accessDeniedHandler((request, response, exception) -> write(mapper, request, response, ErrorCode.FORBIDDEN)))
+            .headers(headers -> headers
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                .frameOptions(frame -> frame.sameOrigin())
+                .contentTypeOptions(contentType -> {})
+                .referrerPolicy(policy -> policy.policy(
+                    org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .contentSecurityPolicy(policy -> policy.policyDirectives(
+                    "default-src 'none'; frame-ancestors 'self'; form-action 'self'")));
+        return http.build();
+    }
+
+    private static void write(
+        ObjectMapper mapper,
+        HttpServletRequest request,
+        HttpServletResponse response,
+        ErrorCode code
+    ) throws IOException {
+        response.setStatus(code.status().value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        String requestId = (String) request.getAttribute(RequestIdFilter.REQUEST_ID);
+        mapper.writeValue(response.getOutputStream(), ApiResponse.error(code.name(), code.message(), List.of(), requestId));
+    }
+
+    static class CsrfCookieFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            jakarta.servlet.FilterChain chain
+        ) throws jakarta.servlet.ServletException, IOException {
+            CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            if (token != null) token.getToken();
+            chain.doFilter(request, response);
+        }
+    }
 }

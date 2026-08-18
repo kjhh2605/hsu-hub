@@ -38,7 +38,6 @@ dependencies {
     implementation 'org.apache.tika:tika-core:3.2.2'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.81'
     implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:sesv2'
 
     runtimeOnly 'com.mysql:mysql-connector-j'
     runtimeOnly 'org.flywaydb:flyway-core'

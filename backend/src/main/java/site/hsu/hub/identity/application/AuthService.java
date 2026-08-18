@@ -1,16 +1,9 @@
 package site.hsu.hub.identity.application;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 import site.hsu.hub.common.exception.ApiException;
 import site.hsu.hub.common.exception.ErrorCode;
-import site.hsu.hub.identity.adapter.out.persistence.EmailVerificationTokenEntity;
-import site.hsu.hub.identity.adapter.out.persistence.EmailVerificationTokenRepository;
-import site.hsu.hub.identity.adapter.out.persistence.PasswordResetTokenEntity;
-import site.hsu.hub.identity.adapter.out.persistence.PasswordResetTokenRepository;
 import site.hsu.hub.identity.adapter.out.persistence.UserEntity;
 import site.hsu.hub.identity.adapter.out.persistence.UserRepository;
 import site.hsu.hub.identity.adapter.out.persistence.UserSessionEntity;
@@ -18,10 +11,8 @@ import site.hsu.hub.identity.adapter.out.persistence.UserSessionRepository;
 import site.hsu.hub.identity.api.SessionUser;
 import site.hsu.hub.identity.application.port.KakaoIdentityClient;
 import site.hsu.hub.identity.application.port.KakaoIdentityClient.KakaoIdentity;
-import site.hsu.hub.identity.domain.EmailAddress;
 import site.hsu.hub.identity.domain.TokenSupport;
 import site.hsu.hub.identity.domain.UserStatus;
-import site.hsu.hub.mail.api.MailSender;
 
 import java.net.URI;
 import java.time.Duration;
@@ -31,92 +22,20 @@ import java.util.Locale;
 @Service
 public class AuthService {
     private final UserRepository users;
-    private final EmailVerificationTokenRepository verificationTokens;
-    private final PasswordResetTokenRepository resetTokens;
     private final UserSessionRepository sessions;
-    private final PasswordEncoder passwords;
-    private final MailSender mail;
     private final RateLimiter rate;
     private final KakaoIdentityClient kakao;
-    private final TransactionTemplate tx;
 
     public AuthService(
         UserRepository users,
-        EmailVerificationTokenRepository verificationTokens,
-        PasswordResetTokenRepository resetTokens,
         UserSessionRepository sessions,
-        PasswordEncoder passwords,
-        MailSender mail,
         RateLimiter rate,
-        KakaoIdentityClient kakao,
-        PlatformTransactionManager transactionManager
+        KakaoIdentityClient kakao
     ) {
         this.users = users;
-        this.verificationTokens = verificationTokens;
-        this.resetTokens = resetTokens;
         this.sessions = sessions;
-        this.passwords = passwords;
-        this.mail = mail;
         this.rate = rate;
         this.kakao = kakao;
-        this.tx = new TransactionTemplate(transactionManager);
-    }
-
-    public void signup(String rawEmail, String password, String ip) {
-        EmailAddress email = EmailAddress.hansung(rawEmail);
-        validatePassword(password);
-        rate.check("signup:ip:" + ip, 5, Duration.ofMinutes(10));
-        rate.check("signup:email:" + email.value(), 3, Duration.ofHours(1));
-        String token = tx.execute(status -> {
-            if (users.findByEmail(email.value()).isPresent()) return null;
-            var user = users.save(new UserEntity(email.value(), passwords.encode(password)));
-            String raw = TokenSupport.newRawToken();
-            verificationTokens.save(new EmailVerificationTokenEntity(user.id(), TokenSupport.sha256(raw), Instant.now().plus(Duration.ofHours(24))));
-            return raw;
-        });
-        if (token != null) mail.sendVerification(email.value(), token);
-    }
-
-    public void resend(String rawEmail, String ip) {
-        EmailAddress email = EmailAddress.hansung(rawEmail);
-        rate.check("verify:ip:" + ip, 10, Duration.ofHours(1));
-        rate.check("verify:email:" + email.value(), 3, Duration.ofHours(1));
-        String token = tx.execute(status -> {
-            var user = users.findByEmail(email.value()).orElse(null);
-            if (user == null || user.emailVerifiedAt() != null) return null;
-            String raw = TokenSupport.newRawToken();
-            verificationTokens.save(new EmailVerificationTokenEntity(user.id(), TokenSupport.sha256(raw), Instant.now().plus(Duration.ofHours(24))));
-            return raw;
-        });
-        if (token != null) mail.sendVerification(email.value(), token);
-    }
-
-    @Transactional
-    public void confirmEmail(String raw) {
-        Instant now = Instant.now();
-        var token = verificationTokens.findByTokenHash(TokenSupport.sha256(raw))
-            .orElseThrow(() -> new ApiException(ErrorCode.BAD_REQUEST, "유효하지 않은 인증 토큰입니다."));
-        if (token.consumedAt() != null || TokenSupport.isExpired(token.expiresAt(), now)) {
-            throw new ApiException(ErrorCode.BAD_REQUEST, "만료되었거나 사용된 인증 토큰입니다.");
-        }
-        users.findById(token.userId()).orElseThrow(() -> new ApiException(ErrorCode.BAD_REQUEST)).verify(now);
-        token.consume(now);
-    }
-
-    @Transactional
-    public LoginResult login(String rawEmail, String password, String ip) {
-        String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase(Locale.ROOT);
-        rate.check("login:ip:" + ip, 20, Duration.ofMinutes(10));
-        rate.check("login:email:" + email, 10, Duration.ofMinutes(10));
-        var user = users.findByEmail(email)
-            .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호를 확인해 주세요."));
-        if (user.status() != UserStatus.ACTIVE || !passwords.matches(password, user.passwordHash())) {
-            throw new ApiException(ErrorCode.UNAUTHORIZED, "이메일 또는 비밀번호를 확인해 주세요.");
-        }
-        if (user.emailVerifiedAt() == null) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "이메일 인증을 완료해 주세요.");
-        }
-        return createSession(user, Instant.now());
     }
 
     @Transactional
@@ -141,42 +60,14 @@ public class AuthService {
         sessions.findById(TokenSupport.sha256(rawSession)).ifPresent(session -> session.revoke(Instant.now()));
     }
 
-    public void requestReset(String rawEmail, String ip) {
-        String normalized = rawEmail == null ? "" : rawEmail.trim().toLowerCase(Locale.ROOT);
-        rate.check("reset:ip:" + ip, 10, Duration.ofHours(1));
-        rate.check("reset:email:" + normalized, 3, Duration.ofHours(1));
-        String token = tx.execute(status -> {
-            var user = users.findByEmail(normalized).orElse(null);
-            if (user == null) return null;
-            String raw = TokenSupport.newRawToken();
-            resetTokens.save(new PasswordResetTokenEntity(user.id(), TokenSupport.sha256(raw), Instant.now().plus(Duration.ofMinutes(30))));
-            return raw;
-        });
-        if (token != null) mail.sendPasswordReset(normalized, token);
-    }
-
     @Transactional
-    public void confirmReset(String raw, String password) {
-        validatePassword(password);
+    public SessionUser authenticate(String rawSession) {
+        if (rawSession == null) return null;
         Instant now = Instant.now();
-        var token = resetTokens.findByTokenHash(TokenSupport.sha256(raw))
-            .orElseThrow(() -> new ApiException(ErrorCode.BAD_REQUEST, "유효하지 않은 재설정 토큰입니다."));
-        if (token.consumedAt() != null || TokenSupport.isExpired(token.expiresAt(), now)) {
-            throw new ApiException(ErrorCode.BAD_REQUEST, "만료되었거나 사용된 재설정 토큰입니다.");
-        }
-        users.findById(token.userId()).orElseThrow(() -> new ApiException(ErrorCode.BAD_REQUEST))
-            .changePassword(passwords.encode(password));
-        token.consume(now);
-    }
-
-    @Transactional
-    public SessionUser authenticate(String raw) {
-        if (raw == null) return null;
-        Instant now = Instant.now();
-        var session = sessions.findById(TokenSupport.sha256(raw)).orElse(null);
+        var session = sessions.findById(TokenSupport.sha256(rawSession)).orElse(null);
         if (session == null || session.revokedAt() != null || TokenSupport.isExpired(session.expiresAt(), now)) return null;
         var user = users.findById(session.userId()).orElse(null);
-        if (user == null || user.status() != UserStatus.ACTIVE || user.emailVerifiedAt() == null) return null;
+        if (user == null || user.status() != UserStatus.ACTIVE) return null;
         session.touch(now);
         return new SessionUser(user.id(), user.email(), user.serviceRole());
     }
@@ -196,12 +87,6 @@ public class AuthService {
 
     private static void requireActive(UserEntity user) {
         if (user.status() != UserStatus.ACTIVE) throw new ApiException(ErrorCode.FORBIDDEN);
-    }
-
-    private static void validatePassword(String password) {
-        if (password == null || password.length() < 10) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "비밀번호는 10자 이상이어야 합니다.");
-        }
     }
 
     public record LoginResult(String rawSession, SessionUser user) {}

@@ -5,29 +5,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
-import site.hsu.hub.identity.adapter.out.persistence.UserEntity;
-import site.hsu.hub.identity.adapter.out.persistence.UserRepository;
 import site.hsu.hub.identity.application.port.KakaoIdentityClient;
 import site.hsu.hub.identity.application.port.KakaoIdentityClient.KakaoIdentity;
 
 import java.net.URI;
-import java.time.Instant;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -38,24 +30,7 @@ class SecuritySessionTest {
     private static final URI APPLICANT_CALLBACK = URI.create("https://hsu-hub.site/api/v1/auth/kakao/callback");
 
     @Autowired MockMvc mvc;
-    @Autowired UserRepository users;
-    @Autowired PasswordEncoder encoder;
     @MockitoBean KakaoIdentityClient kakao;
-
-    @Test
-    void passwordUsesArgon2idAndLoginSetsHostOnlySecureCookie() throws Exception {
-        String email = UUID.randomUUID() + "@hansung.ac.kr";
-        var user = new UserEntity(email, encoder.encode("password1234"));
-        user.verify(Instant.now());
-        users.save(user);
-        assertThat(user.passwordHash()).startsWith("$argon2id$");
-        mvc.perform(post("/api/v1/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"" + email + "\",\"password\":\"password1234\"}"))
-            .andExpect(status().isOk())
-            .andExpect(header().string("Set-Cookie", allOf(
-                containsString("__Host-HSU_SESSION="), containsString("Path=/"), containsString("Secure"),
-                containsString("HttpOnly"), containsString("SameSite=Lax"), not(containsString("Domain=")))));
-    }
 
     @Test
     void kakaoStartUsesOnlyTheTrustedApplicantOriginAndRequiredEmailScope() throws Exception {
