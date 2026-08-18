@@ -1,5 +1,6 @@
 package site.hsu.hub.identity.adapter.out.kakao;
 
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -108,5 +109,22 @@ class KakaoRestClientTest {
                     .doesNotContain("access-token")
                     .doesNotContain("provider-body");
             });
+    }
+
+    @Test
+    void rejectsRelativeFrontendOrigins() {
+        KakaoOAuthProperties invalid = new KakaoOAuthProperties(
+            "test-client-id",
+            "test-client-secret",
+            URI.create("https://kauth.kakao.com/oauth/authorize"),
+            URI.create("https://kauth.kakao.com/oauth/token"),
+            URI.create("https://kapi.kakao.com/v2/user/me"),
+            URI.create("/relative-applicant"),
+            URI.create("https://admin.hsu-hub.site")
+        );
+
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(invalid)).isNotEmpty();
+        }
     }
 }

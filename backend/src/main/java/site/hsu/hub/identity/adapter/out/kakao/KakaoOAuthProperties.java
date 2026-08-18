@@ -24,7 +24,24 @@ public record KakaoOAuthProperties(
         return isHttps(authorizeUri) && isHttps(tokenUri) && isHttps(userInfoUri);
     }
 
+    @AssertTrue(message = "Frontend origins must be explicit HTTP(S) origins")
+    public boolean isFrontendOriginsExplicit() {
+        return isOrigin(applicantOrigin) && isOrigin(adminOrigin);
+    }
+
     private static boolean isHttps(URI uri) {
         return uri != null && "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null;
+    }
+
+    private static boolean isOrigin(URI uri) {
+        if (uri == null || uri.getHost() == null) return false;
+        String scheme = uri.getScheme();
+        boolean webScheme = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
+        String path = uri.getPath();
+        return webScheme
+            && (path == null || path.isEmpty() || "/".equals(path))
+            && uri.getRawQuery() == null
+            && uri.getRawFragment() == null
+            && uri.getUserInfo() == null;
     }
 }
