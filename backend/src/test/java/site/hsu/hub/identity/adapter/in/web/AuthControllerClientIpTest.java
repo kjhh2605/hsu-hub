@@ -24,6 +24,7 @@ class AuthControllerClientIpTest {
     void fallsBackToTheDirectPeerWhenTheTrustedHeaderIsMissingOrMalformed() {
         assertThat(AuthController.clientIp(request("127.0.0.1", null))).isEqualTo("127.0.0.1");
         assertThat(AuthController.clientIp(request("10.42.1.10", "not-an-address"))).isEqualTo("10.42.1.10");
+        assertThat(AuthController.clientIp(request("10.42.1.10", "[:::]:46532"))).isEqualTo("10.42.1.10");
     }
 
     private static MockHttpServletRequest request(String remoteAddress, String viewerAddress) {

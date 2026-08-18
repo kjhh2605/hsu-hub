@@ -37,7 +37,7 @@ Before the first deploy:
    - `https://hsu-hub.site/api/v1/auth/kakao/callback`
    - `https://admin.hsu-hub.site/api/v1/auth/kakao/callback`
    - `http://localhost:5173/api/v1/auth/kakao/callback` for the applicant local reverse proxy
-   - `http://localhost:5174/api/v1/auth/kakao/callback` for the operator local reverse proxy
+   - `http://127.0.0.1:5174/api/v1/auth/kakao/callback` for the operator local reverse proxy; the distinct host keeps its host-only cookies separate from the applicant app
 
 7. Configure `account_email` as required consent and enable provision after collecting the email through Kakao Account. Complete any Kakao business-app or personal-information review required before production email consent is available.
 8. Publish a privacy policy that states why the Kakao service user ID and email are collected and how long each value is retained.

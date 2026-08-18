@@ -20,7 +20,10 @@ import site.hsu.hub.identity.api.SessionUser;
 import site.hsu.hub.identity.application.AuthService;
 import site.hsu.hub.identity.application.RateLimiter;
 
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.time.Duration;
 
 @RestController
@@ -183,7 +186,14 @@ public class AuthController implements AuthControllerDocs {
     }
 
     private static boolean validAddress(String address) {
-        if (address.indexOf(':') >= 0) return address.matches("[0-9A-Fa-f:]+");
+        if (address.indexOf(':') >= 0) {
+            if (!address.matches("[0-9A-Fa-f:]+")) return false;
+            try {
+                return InetAddress.getByName(address) instanceof Inet6Address;
+            } catch (UnknownHostException exception) {
+                return false;
+            }
+        }
         String[] octets = address.split("\\.", -1);
         if (octets.length != 4) return false;
         for (String octet : octets) {
