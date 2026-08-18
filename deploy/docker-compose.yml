@@ -13,12 +13,12 @@ services:
     tmpfs:
       - /tmp:size=128m,mode=1777
     environment:
-      SPRING_PROFILES_ACTIVE: production
+      SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/hsuhub?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       HSU_HUB_SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
-      HSU_HUB_S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
+      HSU_STORAGE_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
       HSU_HUB_S3_UPLOAD_PREFIX: uploads/
       HSU_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?KAKAO_CLIENT_ID is required}
       HSU_KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?KAKAO_CLIENT_SECRET is required}

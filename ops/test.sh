@@ -33,6 +33,17 @@ grep -q 'read_only: true' "$repo_root/deploy/docker-compose.yml"
 grep -q 'no-new-privileges:true' "$repo_root/deploy/docker-compose.yml"
 grep -q 'assume-role' "$repo_root/deploy/runtime-backup.sh"
 grep -q 'image scan' "$repo_root/.github/workflows/production.yml"
+grep -q -- '--timeout 20m' "$repo_root/.github/workflows/production.yml"
+grep -q 'apk upgrade --no-cache' "$repo_root/backend/Dockerfile"
+grep -q 'docker-compose-linux-x86_64' "$repo_root/ops/deploy.sh"
+grep -q 'v5.5.0' "$repo_root/ops/deploy.sh"
+grep -q 'c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b' "$repo_root/ops/deploy.sh"
+grep -q 'sha256sum -c' "$repo_root/ops/deploy.sh"
+grep -q 'SSM_COMMAND_TIMEOUT_SECONDS' "$repo_root/ops/lib/common.sh"
+if grep -q 'ssm wait command-executed' "$repo_root/ops/lib/common.sh"; then
+  echo 'SSM command helper still uses the short AWS CLI waiter' >&2
+  exit 1
+fi
 grep -q 'KAKAO_SECRET_ARN' "$repo_root/ops/deploy.sh"
 grep -q 'KAKAO_SECRET_ARN' "$repo_root/deploy/runtime-deploy.sh"
 grep -q 'KAKAO_SECRET_ARN' "$repo_root/.github/workflows/production.yml"
@@ -40,6 +51,12 @@ grep -q 'HSU_KAKAO_CLIENT_ID' "$repo_root/deploy/docker-compose.yml"
 grep -q 'HSU_KAKAO_CLIENT_SECRET' "$repo_root/deploy/docker-compose.yml"
 grep -q 'HSU_KAKAO_APPLICANT_ORIGIN' "$repo_root/deploy/docker-compose.yml"
 grep -q 'HSU_KAKAO_ADMIN_ORIGIN' "$repo_root/deploy/docker-compose.yml"
+grep -Eq 'SPRING_PROFILES_ACTIVE:[[:space:]]+prod$' "$repo_root/deploy/docker-compose.yml"
+grep -q 'HSU_STORAGE_BUCKET:' "$repo_root/deploy/docker-compose.yml"
+if grep -q 'HSU_HUB_S3_BUCKET:' "$repo_root/deploy/docker-compose.yml"; then
+  echo 'storage bucket environment variable does not match hsu.storage.bucket' >&2
+  exit 1
+fi
 
 stale_auth_mail_pattern='FROM_''EMAIL|SES_PRODUCTION_ACCESS_''ACKNOWLEDGED|sesProductionAccess''Acknowledged'
 if grep -R -nE "$stale_auth_mail_pattern" \

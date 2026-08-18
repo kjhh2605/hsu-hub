@@ -21,7 +21,7 @@ class MigrationContractTest {
         int firstDrop = sql.indexOf("DROP TABLE");
         int guardRemoval = sql.lastIndexOf("DROP CHECK ck_kakao_migration_requires_empty_users");
 
-        assertThat(sql).contains("CHECK (1 = 0)");
+        assertThat(sql).contains("CHECK (created_at IS NULL)");
         assertThat(guard).isGreaterThanOrEqualTo(0).isLessThan(firstDrop);
         assertThat(guardRemoval).isGreaterThan(firstDrop);
     }

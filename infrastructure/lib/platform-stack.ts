@@ -57,6 +57,24 @@ export class PlatformStack extends Stack {
       enableKeyRotation: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    dataKey.addToResourcePolicy(new iam.PolicyStatement({
+      sid: 'AllowCloudWatchLogsEncryption',
+      principals: [new iam.ServicePrincipal(`logs.${config.region}.amazonaws.com`)],
+      actions: [
+        'kms:Encrypt',
+        'kms:Decrypt',
+        'kms:ReEncrypt*',
+        'kms:GenerateDataKey*',
+        'kms:Describe*',
+      ],
+      resources: ['*'],
+      conditions: {
+        ArnLike: {
+          'kms:EncryptionContext:aws:logs:arn':
+            `arn:aws:logs:${config.region}:${config.account}:log-group:*`,
+        },
+      },
+    }));
     const alarmKey = new kms.Key(this, 'AlarmKey', {
       alias: 'alias/hsu-hub-alarms',
       enableKeyRotation: true,
@@ -286,9 +304,14 @@ export class PlatformStack extends Stack {
       resources: [serviceDataBucket.bucketArn, serviceDataBucket.arnForObjects('*')],
     }));
     s3Endpoint.addToPolicy(new iam.PolicyStatement({
-      principals: [new iam.ArnPrincipal(instanceRole.roleArn)],
+      principals: [new iam.AnyPrincipal()],
       actions: ['s3:GetObject'],
       resources: [`arn:aws:s3:::prod-${config.region}-starport-layer-bucket/*`],
+    }));
+    s3Endpoint.addToPolicy(new iam.PolicyStatement({
+      principals: [new iam.AnyPrincipal()],
+      actions: ['s3:GetObject'],
+      resources: [`arn:aws:s3:::al2023-repos-${config.region}-de612dc2/*`],
     }));
     serviceDataBucket.addToResourcePolicy(new iam.PolicyStatement({
       sid: 'UploadsMustUseVpcEndpoint',
@@ -352,7 +375,11 @@ export class PlatformStack extends Stack {
       description: 'CloudFront VPC Origin service ENIs reach the internal ALB',
       allowAllOutbound: false,
     });
-    loadBalancerSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(80), 'CloudFront VPC Origin ENIs');
+    loadBalancerSecurityGroup.addIngressRule(
+      ec2.Peer.prefixList('pl-22a6434b'),
+      ec2.Port.tcp(80),
+      'CloudFront origin-facing managed prefix list',
+    );
     loadBalancerSecurityGroup.addEgressRule(instanceSecurityGroup, ec2.Port.tcp(8080), 'Backend target');
     instanceSecurityGroup.addIngressRule(loadBalancerSecurityGroup, ec2.Port.tcp(8080), 'Internal ALB only');
 
@@ -477,6 +504,10 @@ CWCONFIG`,
     });
     const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
       securityHeadersBehavior: {
+        contentSecurityPolicy: {
+          contentSecurityPolicy: "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+          override: true,
+        },
         contentTypeOptions: { override: true },
         frameOptions: { frameOption: cloudfront.HeadersFrameOption.SAMEORIGIN, override: true },
         referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
@@ -485,7 +516,6 @@ CWCONFIG`,
       },
       customHeadersBehavior: {
         customHeaders: [
-          { header: 'Content-Security-Policy', value: "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'", override: true },
           { header: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()', override: true },
         ],
       },

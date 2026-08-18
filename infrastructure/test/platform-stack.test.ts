@@ -81,6 +81,56 @@ describe('PlatformStack', () => {
     });
   });
 
+  it('allows the internal load balancer only from the CloudFront origin-facing prefix list', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::EC2::SecurityGroupIngress', {
+      Description: 'CloudFront origin-facing managed prefix list',
+      FromPort: 80,
+      IpProtocol: 'tcp',
+      SourcePrefixListId: 'pl-22a6434b',
+      ToPort: 80,
+    });
+
+    const loadBalancerGroups = Object.values(template.findResources('AWS::EC2::SecurityGroup'))
+      .filter((resource) => resource.Properties?.GroupDescription ===
+        'CloudFront VPC Origin service ENIs reach the internal ALB');
+    expect(loadBalancerGroups).toHaveLength(1);
+    expect(loadBalancerGroups[0]?.Properties?.SecurityGroupIngress ?? []).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ CidrIp: '10.42.0.0/16' })]),
+    );
+  });
+
+  it('allows CloudWatch Logs to use the data key only for this account log groups', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::KMS::Key', {
+      Description: 'Encrypts HSU Hub secrets and ECR images',
+      KeyPolicy: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith([
+              'kms:Encrypt',
+              'kms:Decrypt',
+              'kms:ReEncrypt*',
+              'kms:GenerateDataKey*',
+              'kms:Describe*',
+            ]),
+            Condition: {
+              ArnLike: {
+                'kms:EncryptionContext:aws:logs:arn':
+                  `arn:aws:logs:${config.region}:${config.account}:log-group:*`,
+              },
+            },
+            Effect: 'Allow',
+            Principal: { Service: `logs.${config.region}.amazonaws.com` },
+            Resource: '*',
+          }),
+        ]),
+      }),
+    });
+  });
+
   it('creates exactly three encrypted private buckets', () => {
     const template = synthesize();
 
@@ -134,6 +184,22 @@ describe('PlatformStack', () => {
         }),
       }),
     });
+  });
+
+  it('renders content security policy through the dedicated CloudFront security header field', () => {
+    const template = synthesize();
+    const policies = Object.values(template.findResources('AWS::CloudFront::ResponseHeadersPolicy'));
+
+    expect(policies).toHaveLength(1);
+    const policyConfig = policies[0]?.Properties?.ResponseHeadersPolicyConfig;
+    expect(policyConfig?.SecurityHeadersConfig?.ContentSecurityPolicy).toEqual({
+      ContentSecurityPolicy:
+        "default-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+      Override: true,
+    });
+    expect(policyConfig?.CustomHeadersConfig?.Items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ Header: 'Content-Security-Policy' }),
+    ]));
   });
 
   it('forwards the CloudFront-generated viewer address for trusted rate limits', () => {
@@ -221,7 +287,14 @@ describe('PlatformStack', () => {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
           Match.objectLike({
+            Action: 's3:GetObject',
+            Principal: { AWS: '*' },
             Resource: 'arn:aws:s3:::prod-ap-northeast-2-starport-layer-bucket/*',
+          }),
+          Match.objectLike({
+            Action: 's3:GetObject',
+            Principal: { AWS: '*' },
+            Resource: 'arn:aws:s3:::al2023-repos-ap-northeast-2-de612dc2/*',
           }),
         ]),
       }),

@@ -43,6 +43,16 @@ env_b64=$(encode_file "$deployment_env")
 
 cat > "$payload" <<EOF
 set -euo pipefail
+if ! docker compose version --short 2>/dev/null | grep -Fxq '5.5.0'; then
+  install -d -m 755 /usr/local/lib/docker/cli-plugins
+  curl --fail --location --retry 5 --retry-all-errors \
+    --output /tmp/docker-compose-v5.5.0 \
+    https://github.com/docker/compose/releases/download/v5.5.0/docker-compose-linux-x86_64
+  echo 'c57ab918abd5b05ca7e7d0f275875dd1330a695074f309dc9eab1b49efafcd4b  /tmp/docker-compose-v5.5.0' | sha256sum -c -
+  install -m 0755 /tmp/docker-compose-v5.5.0 /usr/local/lib/docker/cli-plugins/docker-compose
+  rm -f /tmp/docker-compose-v5.5.0
+fi
+docker compose version
 install -d -m 750 /opt/hsu-hub /opt/hsu-hub/logs
 chown 10001:10001 /opt/hsu-hub/logs
 printf '%s' '$compose_b64' | base64 -d > /opt/hsu-hub/docker-compose.yml
