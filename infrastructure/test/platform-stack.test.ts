@@ -16,7 +16,8 @@ const config: HsuHubConfig = {
   githubEnvironment: 'production',
   operationsPrincipalArn: 'arn:aws:iam::123456789012:role/HsuHubOperators',
   alertEmail: 'alerts@example.com',
-  sesProductionAccessAcknowledged: true,
+  kakaoSecretArn:
+    'arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:/hsu-hub/production/kakao-AbCdEf',
 };
 
 function synthesize(): Template {
@@ -100,7 +101,7 @@ describe('PlatformStack', () => {
 
     template.resourceCountIs('AWS::CloudFront::Distribution', 2);
     template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 2);
-    template.resourceCountIs('AWS::CloudFront::VpcOrigin', 1);
+    template.resourceCountIs('AWS::CloudFront::VpcOrigin', 2);
     template.allResourcesProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({
         CacheBehaviors: Match.arrayWith([
@@ -111,6 +112,42 @@ describe('PlatformStack', () => {
         ]),
       }),
     });
+  });
+
+  it('removes SES while granting runtime access only to the configured Kakao secret', () => {
+    const template = synthesize();
+
+    template.resourceCountIs('AWS::SES::EmailIdentity', 0);
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['secretsmanager:GetSecretValue']),
+            Effect: 'Allow',
+            Resource: config.kakaoSecretArn,
+          }),
+        ]),
+      }),
+    });
+    template.hasOutput('KakaoSecretArn', { Value: config.kakaoSecretArn });
+  });
+
+  it('marks each API origin with its trusted frontend identity', () => {
+    const template = synthesize();
+
+    for (const frontend of ['applicant', 'admin']) {
+      template.resourcePropertiesCountIs('AWS::CloudFront::Distribution', {
+        DistributionConfig: Match.objectLike({
+          Origins: Match.arrayWith([
+            Match.objectLike({
+              OriginCustomHeaders: Match.arrayWith([
+                { HeaderName: 'X-HSU-Frontend', HeaderValue: frontend },
+              ]),
+            }),
+          ]),
+        }),
+      }, 1);
+    }
   });
 
   it('retains backup objects for 14 days and enables ECR scanning', () => {

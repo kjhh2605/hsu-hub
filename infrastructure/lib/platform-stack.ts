@@ -24,7 +24,6 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as ses from 'aws-cdk-lib/aws-ses';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import type { Construct } from 'constructs';
@@ -182,6 +181,11 @@ export class PlatformStack extends Stack {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       description: 'Runtime role for the private HSU Hub EC2 instance',
     });
+    const kakaoSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      'KakaoSecret',
+      config.kakaoSecretArn,
+    );
     instanceRole.addToPolicy(new iam.PolicyStatement({
       sid: 'SsmManagedNodeCore',
       actions: [
@@ -224,6 +228,7 @@ export class PlatformStack extends Stack {
     }));
     databaseSecret.grantRead(instanceRole);
     sessionSecret.grantRead(instanceRole);
+    kakaoSecret.grantRead(instanceRole);
     applicationLogGroup.grantWrite(instanceRole);
     systemLogGroup.grantWrite(instanceRole);
     dataKey.grantDecrypt(instanceRole);
@@ -238,13 +243,6 @@ export class PlatformStack extends Stack {
       resources: [serviceDataBucket.bucketArn],
       conditions: { StringLike: { 's3:prefix': ['uploads/*'] } },
     }));
-
-    const emailIdentity = new ses.EmailIdentity(this, 'EmailIdentity', {
-      identity: ses.Identity.publicHostedZone(props.hostedZone),
-      mailFromDomain: `mail.${config.domainName}`,
-      mailFromBehaviorOnMxFailure: ses.MailFromBehaviorOnMxFailure.REJECT_MESSAGE,
-    });
-    emailIdentity.grantSendEmail(instanceRole);
 
     const backupRole = new iam.Role(this, 'BackupRole', {
       assumedBy: new iam.ArnPrincipal(instanceRole.roleArn),
@@ -452,11 +450,19 @@ CWCONFIG`,
       deregistrationDelay: Duration.seconds(60),
     });
 
-    const apiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
+    const applicantApiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: 80,
       readTimeout: Duration.seconds(60),
       keepaliveTimeout: Duration.seconds(5),
+      customHeaders: { 'X-HSU-Frontend': 'applicant' },
+    });
+    const adminApiOrigin = origins.VpcOrigin.withApplicationLoadBalancer(loadBalancer, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: 80,
+      readTimeout: Duration.seconds(60),
+      keepaliveTimeout: Duration.seconds(5),
+      customHeaders: { 'X-HSU-Frontend': 'admin' },
     });
     const apiOriginRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'ApiOriginRequestPolicy', {
       comment: 'Forward session cookies, CSRF and request metadata to Spring',
@@ -502,7 +508,7 @@ CWCONFIG`,
       hostname: config.applicantHostname,
       bucket: applicantBucket,
       certificate: props.viewerCertificate,
-      apiOrigin,
+      apiOrigin: applicantApiOrigin,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
@@ -514,7 +520,7 @@ CWCONFIG`,
       hostname: config.adminHostname,
       bucket: adminBucket,
       certificate: props.viewerCertificate,
-      apiOrigin,
+      apiOrigin: adminApiOrigin,
       apiOriginRequestPolicy,
       responseHeadersPolicy,
       rewriteFunction,
@@ -759,6 +765,7 @@ CWCONFIG`,
       AdminDistributionId: adminDistribution.distributionId,
       DatabaseSecretArn: databaseSecret.secretArn,
       SessionSecretArn: sessionSecret.secretArn,
+      KakaoSecretArn: kakaoSecret.secretArn,
       BackupRoleArn: backupRole.roleArn,
       RestoreRoleArn: restoreRole.roleArn,
       GitHubDeploymentRoleArn: deploymentRole.roleArn,

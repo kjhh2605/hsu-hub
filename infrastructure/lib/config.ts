@@ -11,7 +11,7 @@ export interface HsuHubConfig {
   readonly githubEnvironment: string;
   readonly operationsPrincipalArn: string;
   readonly alertEmail: string;
-  readonly sesProductionAccessAcknowledged: true;
+  readonly kakaoSecretArn: string;
 }
 
 function requiredContext(app: App, key: string): string {
@@ -30,7 +30,7 @@ export function loadConfig(app: App): HsuHubConfig {
   const githubEnvironment = requiredContext(app, 'githubEnvironment');
   const operationsPrincipalArn = requiredContext(app, 'operationsPrincipalArn');
   const alertEmail = requiredContext(app, 'alertEmail');
-  const sesProductionAccessAcknowledged = app.node.tryGetContext('sesProductionAccessAcknowledged');
+  const kakaoSecretArn = requiredContext(app, 'kakaoSecretArn');
 
   if (!/^\d{12}$/.test(account)) {
     throw new Error('account must be a 12-digit AWS account ID');
@@ -56,8 +56,13 @@ export function loadConfig(app: App): HsuHubConfig {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alertEmail)) {
     throw new Error('alertEmail must be a valid email address');
   }
-  if (sesProductionAccessAcknowledged !== true && sesProductionAccessAcknowledged !== 'true') {
-    throw new Error('sesProductionAccessAcknowledged must be true after SES production access is approved');
+  const kakaoSecretArnPattern = new RegExp(
+    `^arn:aws:secretsmanager:${region}:${account}:secret:[A-Za-z0-9/_+=.@-]+-[A-Za-z0-9]{6}$`,
+  );
+  if (!kakaoSecretArnPattern.test(kakaoSecretArn)) {
+    throw new Error(
+      `kakaoSecretArn must be a Secrets Manager secret in account ${account} and region ${region}`,
+    );
   }
 
   return {
@@ -71,6 +76,6 @@ export function loadConfig(app: App): HsuHubConfig {
     githubEnvironment,
     operationsPrincipalArn,
     alertEmail,
-    sesProductionAccessAcknowledged: true,
+    kakaoSecretArn,
   };
 }
