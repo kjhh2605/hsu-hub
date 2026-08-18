@@ -33,7 +33,7 @@ Implementation must preserve the approved visual flows from `mobile/` and `web/`
 - Email/password signup for `@hansung.ac.kr` only.
 - Email verification, login, logout, forgotten-password, and password-reset flows.
 - Authenticated club list and club/recruitment detail.
-- Operator-managed persistent club introduction, activity information, and cover image.
+- Operator-managed persistent club profile with a representative cover, introduction content, ordered introduction images, and a manual recruitment status.
 - One concurrently active recruitment per club, with historical recruitments retained.
 - Recruitment authoring wizard with the existing page, stage, form, and review steps.
 - Stage schedule configuration for document result, interview, and final result dates.
@@ -190,9 +190,14 @@ Flyway owns all schema changes. MySQL uses `utf8mb4` and UTC timestamps.
 
 - `id`, `name`, `category`
 - persistent short introduction and detailed introduction
-- activity period and activity place
+- recruitment status: `RECRUITING | CLOSED`
 - nullable cover `file_asset_id`
 - audit timestamps
+
+`club_introduction_images`
+
+- club ID, file asset ID, and display order
+- at most ten ordered images per club, rendered as a horizontal strip below the introduction
 
 `club_users`
 
@@ -206,13 +211,12 @@ A user may be mapped to more than one club. The selected club ID is part of the 
 
 `recruitments`
 
-- `id`, `club_id`, title, quota
+- `id`, `club_id`
 - open and close timestamps
-- immutable structured content blocks
 - publication timestamp
 - audit metadata
 
-The displayed state is derived from time: `SCHEDULED`, `OPEN`, or `CLOSED`. The application service locks the club row and rejects a new publication when its open/close interval overlaps another published recruitment for the club.
+The displayed state is derived from time: `SCHEDULED`, `OPEN`, or `CLOSED`, while the club profile separately controls whether the user-facing support action is `모집중` or `모집완료`. The application service locks the club row and rejects a new publication when its open/close interval overlaps another published recruitment for the club. The profile introduction is the user-facing recruitment post; recruitment management only owns dates, selection stages, form generation, and publication.
 
 `recruitment_stages`
 
@@ -295,9 +299,9 @@ Flow:
 
 1. The home shows `동아리` and disabled `시설예약` choices.
 2. Selecting clubs while signed out sends the user to login and restores `/clubs` after success.
-3. The club list includes every seeded club. Recruitment badges are derived from the active period.
-4. Club detail uses the cover in the hero with category, recruitment state, name, and introduction over a contrast overlay.
-5. Apply is enabled only during the open interval and only before the user has submitted.
+3. The club list includes every seeded club. Recruitment badges use the club's manual recruitment status.
+4. Club detail uses the cover in the hero with category, recruitment state, name, and the profile introduction over a contrast overlay. Introduction images appear in one horizontal scrolling row below it.
+5. Apply is enabled only for a club marked `모집중`, with a published recruitment whose open interval is valid, and only before the user has submitted. The action navigates directly to the application form.
 6. Form steps are rendered from the published schema.
 7. A final review screen displays all answers and the chosen PDF filename or URL.
 8. A successful atomic submission navigates to the completion screen.
@@ -321,7 +325,7 @@ Operator routes:
 - `/admin/applicants`
 - `/admin/applicants/:applicationId`
 
-The authoring wizard keeps the existing four visible steps. The stage step retains document-result, interview, and final-result schedule configuration even though the downstream workflows are absent.
+The authoring wizard keeps the existing four visible steps. Its first step collects only recruitment dates; the stage step retains document-result, interview, and final-result schedule configuration even though the downstream workflows are absent. Profile introduction content is not duplicated in the wizard.
 
 The recruitment list contains published history only because operator drafts are excluded. The applicant list filters by recruitment. When a form has a semantic name question, its answer is the display name; otherwise the UI uses `지원자 {publicId}`.
 

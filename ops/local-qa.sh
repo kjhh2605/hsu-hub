@@ -125,8 +125,8 @@ echo "Starting Spring backend on http://127.0.0.1:8080"
   HSU_KAKAO_CLIENT_ID="${HSU_KAKAO_CLIENT_ID:-local-qa-client}" \
   HSU_KAKAO_CLIENT_SECRET="${HSU_KAKAO_CLIENT_SECRET:-local-qa-secret}" \
   HSU_KAKAO_APPLICANT_ORIGIN=http://localhost:5173 \
-  HSU_KAKAO_ADMIN_ORIGIN=http://127.0.0.1:5174 \
-  CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5174 \
+  HSU_KAKAO_ADMIN_ORIGIN=http://localhost:5174 \
+  CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5174 \
   SPRING_PROFILES_ACTIVE=local \
     ./gradlew --no-daemon bootRun
 ) &
@@ -172,7 +172,7 @@ VALUES (SHA2('$qa_session', 256), @qa_user_id, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6
 ON DUPLICATE KEY UPDATE user_id = @qa_user_id, revoked_at = NULL, last_seen_at = UTC_TIMESTAMP(6), expires_at = DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY);
 SQL
 
-echo "Starting operator frontend on http://127.0.0.1:5174"
+echo "Starting operator frontend on http://localhost:5174"
 (
   cd "$repo_root"
   npm run dev --workspace web
@@ -183,7 +183,7 @@ cat <<EOF
 
 Local QA is ready.
 
-1. Open: http://127.0.0.1:5174
+1. Open: http://localhost:5174
 2. To use the seeded operator session, open DevTools Console on that page and run:
 
 document.cookie = '__Host-HSU_SESSION=$qa_session; Path=/; Secure'; location.reload();

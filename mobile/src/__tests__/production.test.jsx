@@ -22,6 +22,15 @@ function renderRoute(route, session = null) {
   return render(<MemoryRouter initialEntries={[route]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
 }
 
+function renderClubDetail(club) {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+    if (String(url).includes('/auth/session')) return response({ success: true, data: { id: 'u1', email: 'u@hansung.ac.kr', role: 'USER' } });
+    if (String(url).endsWith('/clubs/c1')) return response({ success: true, data: club });
+    throw new Error(`unexpected ${url}`);
+  });
+  return render(<MemoryRouter initialEntries={['/clubs/c1']}><AuthProvider><App /></AuthProvider></MemoryRouter>);
+}
+
 const removedAuthRoutes = [
   `/${['sign', 'up'].join('')}`,
   `/${['verify', 'email'].join('-')}`,
@@ -84,6 +93,25 @@ describe('applicant production contract', () => {
     renderRoute('/clubs', { id: 'u1', email: 'u@hansung.ac.kr', role: 'USER' });
     expect(await screen.findByRole('heading', { name: '동아리 찾기' })).toBeInTheDocument();
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/v1/clubs', expect.any(Object)));
+  });
+
+  it('uses the profile introduction as the detail content and links recruiting clubs directly to the form', async () => {
+    renderClubDetail({ id: 'c1', name: '멋사', category: 'IT/개발', shortIntroduction: '함께 만드는 동아리', detailedIntroduction: '이 글이 곧 사용자에게 보이는 모집글입니다.', recruitmentStatus: 'RECRUITING', introductionImages: [{ id: 'img1' }], recruitment: { recruitmentId: 'r1', state: 'OPEN', alreadyApplied: false } });
+    expect(await screen.findByRole('heading', { name: '동아리 소개' })).toBeInTheDocument();
+    const detailCopy = screen.getByText('이 글이 곧 사용자에게 보이는 모집글입니다.');
+    const detailImage = screen.getByRole('img', { name: '동아리 소개 이미지 1' });
+    expect(detailCopy).toBeInTheDocument();
+    expect(detailCopy.compareDocumentPosition(detailImage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector('.detail-hero')).not.toBeInTheDocument();
+    expect(screen.queryByText('활동 기간')).not.toBeInTheDocument();
+    expect(detailImage).toHaveAttribute('src', '/api/v1/clubs/c1/introduction-images/img1');
+    expect(screen.getByRole('link', { name: '지원서 작성하기' })).toHaveAttribute('href', '/apply/r1');
+  });
+
+  it('disables the support CTA for a completed club', async () => {
+    renderClubDetail({ id: 'c1', name: '멋사', category: 'IT/개발', recruitmentStatus: 'CLOSED', introductionImages: [], recruitment: { recruitmentId: 'r1', state: 'OPEN', alreadyApplied: false } });
+    expect(await screen.findByRole('link', { name: '지금은 지원할 수 없어요' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('link', { name: '지금은 지원할 수 없어요' })).not.toHaveAttribute('href', '/apply/r1');
   });
 
 });
