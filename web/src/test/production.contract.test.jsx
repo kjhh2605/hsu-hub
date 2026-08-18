@@ -81,6 +81,32 @@ describe('operator production contract', () => {
     expect(screen.getByRole('button', { name: '단계 추가' })).toBeInTheDocument();
   });
 
+  it('keeps the required application stage in the normal document flow', async () => {
+    mount('/admin/recruitments/new/stages', { authenticated: true, user: { id: 'u1' } }, [{ id: 'c1', name: '멋사' }]);
+    expect(await screen.findByRole('heading', { name: '전형 일정 설정' })).toBeInTheDocument();
+    expect(screen.getByText('지원서 접수').closest('article')).not.toHaveClass('fixed');
+  });
+
+  it('refreshes the CSRF token and retries a publish after a forbidden mutation', async () => {
+    const calls = [];
+    document.cookie = '__Host-XSRF-TOKEN=stale-token; Path=/; Secure';
+    const mock = vi.spyOn(globalThis, 'fetch').mockImplementation((url, options = {}) => {
+      calls.push({ url: String(url), options });
+      if (calls.length === 1) return json({ success: false, code: 'FORBIDDEN', message: '접근 권한이 없습니다.' }, 403);
+      if (String(url).endsWith('/auth/session')) {
+        document.cookie = '__Host-XSRF-TOKEN=fresh-token; Path=/; Secure';
+        return json({ success: true, data: { id: 'u1' } });
+      }
+      return json({ success: true, data: { id: 'r1' } }, 201);
+    });
+
+    await api.post('/operator/clubs/c1/recruitments', { title: '모집' });
+
+    expect(mock).toHaveBeenCalledTimes(3);
+    expect(calls[1].url).toContain('/auth/session');
+    expect(calls[2].options.headers['X-XSRF-TOKEN']).toBe('fresh-token');
+  });
+
   it('serializes wizard memory to the exact Spring publish DTO', () => {
     const payload = buildPublishPayload({
       title: '14기 모집', quota: 3, openAt: '2026-08-17T09:00', closeAt: '2026-08-18T18:00', content: '함께해요',

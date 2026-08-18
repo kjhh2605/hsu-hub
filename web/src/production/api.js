@@ -2,12 +2,18 @@ export class ApiError extends Error {
   constructor(message, status = 0, code = 'NETWORK_ERROR', errors = []) { super(message); this.status = status; this.code = code; this.errors = errors; }
 }
 function cookie(name) { return document.cookie.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1) ?? ''; }
-async function request(path, options = {}) {
+function csrfToken() { return cookie('__Host-XSRF-TOKEN') || cookie('XSRF-TOKEN'); }
+async function refreshCsrfToken() {
+  const response = await fetch('/api/v1/auth/session', { method: 'GET', credentials: 'include', headers: { Accept: 'application/json' } });
+  return response.ok;
+}
+async function request(path, options = {}, retry = false) {
   const method = options.method ?? 'GET'; const headers = { Accept: 'application/json', ...options.headers }; let body = options.body;
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) { const token = cookie('__Host-XSRF-TOKEN'); if (token) headers['X-XSRF-TOKEN'] = decodeURIComponent(token); }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) { const token = csrfToken(); if (token) headers['X-XSRF-TOKEN'] = decodeURIComponent(token); }
   if (options.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(options.json); }
   const response = await fetch(`/api/v1${path}`, { method, credentials: 'include', headers, body });
   const payload = response.headers.get('content-type')?.includes('application/json') ? await response.json() : null;
+  if (response.status === 403 && !retry && !['GET', 'HEAD', 'OPTIONS'].includes(method)) { await refreshCsrfToken(); return request(path, options, true); }
   if (!response.ok || payload?.success === false) throw new ApiError(payload?.message || (response.status === 401 ? '로그인이 필요합니다.' : '요청을 처리하지 못했습니다.'), response.status, payload?.code, payload?.errors ?? []);
   return payload && Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
 }

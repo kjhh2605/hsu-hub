@@ -108,6 +108,8 @@
 .stage-card > div { flex:1; }
 .stage-card p { margin:4px 0 0; color:var(--prod-muted); font-size:10px; }
 .stage-card > small { padding:4px 7px; border-radius:99px; color:var(--prod-blue); background:#e7f0ff; font-size:8px; }
+.stage-card .stage-date.warning { color:#b42318; font-weight:700; }
+.stage-card .stage-warning { margin-top:8px; padding:7px 9px; border-radius:7px; color:#9b1c1c; background:#fff0ef; font-size:10px; font-weight:700; }
 .stage-card.muted { opacity:.52; }
 .stage-fields { display:grid; gap:13px; }
 .toggle { display:flex!important; flex-direction:row!important; align-items:center; }
