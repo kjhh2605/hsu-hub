@@ -1,7 +1,7 @@
 -- This cutover is valid only for the approved, undeployed empty platform. MySQL
 -- validates CHECK constraints against existing rows before any destructive DDL.
 ALTER TABLE users
-    ADD CONSTRAINT ck_kakao_migration_requires_empty_users CHECK (id < 0);
+    ADD CONSTRAINT ck_kakao_migration_requires_empty_users CHECK (created_at IS NULL);
 
 DROP TABLE password_reset_tokens;
 DROP TABLE email_verification_tokens;
