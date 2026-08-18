@@ -31,10 +31,37 @@ describe('operator production contract', () => {
   it('guards all operator pages behind the host-local login session', async () => {
     mount('/admin/club');
     expect(await screen.findByRole('heading', { name: '운영진 로그인' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카카오로 계속하기' })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/kakao/start?returnTo=%2Fadmin%2Fclub',
+    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument();
+  });
+
+  it('preserves the full internal operator destination', async () => {
+    mount('/admin/club?tab=profile');
+    expect(await screen.findByRole('link', { name: '카카오로 계속하기' })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/kakao/start?returnTo=%2Fadmin%2Fclub%3Ftab%3Dprofile',
+    );
+  });
+
+  it('explains when Kakao does not provide a verified email', async () => {
+    mount('/login?error=kakao_email_required');
+    expect(await screen.findByRole('alert')).toHaveTextContent('유효하고 인증된 카카오계정 이메일이 필요해요.');
+  });
+
+  it('falls back when router state contains an unsafe destination', async () => {
+    mount({ pathname: '/login', state: { from: '//evil.example' } });
+    expect(await screen.findByRole('link', { name: '카카오로 계속하기' })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/kakao/start?returnTo=%2Fadmin%2Fclub',
+    );
   });
 
   it('does not route removed dashboard, settings, interview, or result pages', async () => {
-    mount('/admin/settings', { authenticated: true, emailVerified: true, user: { id: 'u1' } }, [{ id: 'c1', name: '멋사' }]);
+    mount('/admin/settings', { authenticated: true, user: { id: 'u1' } }, [{ id: 'c1', name: '멋사' }]);
     expect(await screen.findByRole('heading', { name: '페이지를 찾을 수 없습니다' })).toBeInTheDocument();
   });
 
@@ -48,7 +75,7 @@ describe('operator production contract', () => {
   });
 
   it('uses the shared mobile renderer in the authoring preview', async () => {
-    mount('/admin/recruitments/new/form', { authenticated: true, emailVerified: true, user: { id: 'u1' } }, [{ id: 'c1', name: '멋사' }]);
+    mount('/admin/recruitments/new/form', { authenticated: true, user: { id: 'u1' } }, [{ id: 'c1', name: '멋사' }]);
     expect(await screen.findByRole('heading', { name: '지원서 설계' })).toBeInTheDocument();
     expect(screen.getByLabelText(/이름/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '단계 추가' })).toBeInTheDocument();
