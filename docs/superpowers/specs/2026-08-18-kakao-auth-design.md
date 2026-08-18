@@ -1,7 +1,7 @@
 # HSU Hub Kakao Authentication Design
 
 **Date:** 2026-08-18  
-**Status:** Approved in chat; pending written-spec review  
+**Status:** Approved
 **Affected applications:** `mobile`, `web`, `backend`, `infrastructure`, deployment automation
 
 ## 1. Purpose
