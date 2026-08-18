@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      '/api': {
+        target: process.env.HSU_BACKEND_ORIGIN || 'http://localhost:8080',
+        headers: { 'X-HSU-Frontend': 'applicant' },
+      },
+    },
   },
   test: {
     environment: 'jsdom',
