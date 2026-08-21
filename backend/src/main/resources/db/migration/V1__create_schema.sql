@@ -36,18 +36,9 @@ CREATE TABLE file_assets (
 CREATE TABLE clubs (
  id BIGINT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(100) NOT NULL, category VARCHAR(50) NOT NULL,
  short_introduction VARCHAR(240) NULL, detailed_introduction LONGTEXT NULL,
- recruitment_status VARCHAR(20) NOT NULL DEFAULT 'CLOSED', cover_file_asset_id BIGINT NULL,
+ activity_period VARCHAR(100) NULL, activity_place VARCHAR(100) NULL, cover_file_asset_id BIGINT NULL,
  created_at TIMESTAMP(6) NOT NULL, updated_at TIMESTAMP(6) NOT NULL,
  CONSTRAINT fk_club_cover FOREIGN KEY(cover_file_asset_id) REFERENCES file_assets(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE club_introduction_images (
- id BIGINT PRIMARY KEY AUTO_INCREMENT, club_id BIGINT NOT NULL, file_asset_id BIGINT NOT NULL,
- display_order INT NOT NULL,
- UNIQUE KEY uq_club_intro_image_order(club_id,display_order),
- UNIQUE KEY uq_club_intro_image_file(club_id,file_asset_id),
- CONSTRAINT fk_intro_image_club FOREIGN KEY(club_id) REFERENCES clubs(id),
- CONSTRAINT fk_intro_image_file FOREIGN KEY(file_asset_id) REFERENCES file_assets(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE club_users (
@@ -57,12 +48,12 @@ CREATE TABLE club_users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE recruitments (
- id BIGINT PRIMARY KEY AUTO_INCREMENT, club_id BIGINT NOT NULL,
- opens_at TIMESTAMP(6) NOT NULL, closes_at TIMESTAMP(6) NOT NULL,
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, club_id BIGINT NOT NULL, title VARCHAR(160) NOT NULL, quota INT NOT NULL,
+ opens_at TIMESTAMP(6) NOT NULL, closes_at TIMESTAMP(6) NOT NULL, content_blocks LONGTEXT NOT NULL,
  published_at TIMESTAMP(6) NOT NULL, created_by BIGINT NOT NULL, created_at TIMESTAMP(6) NOT NULL,
  INDEX ix_recruitment_club_period(club_id,opens_at,closes_at),
  CONSTRAINT fk_recruitment_club FOREIGN KEY(club_id) REFERENCES clubs(id), CONSTRAINT fk_recruitment_user FOREIGN KEY(created_by) REFERENCES users(id),
- CONSTRAINT ck_recruitment_period CHECK(opens_at < closes_at)
+ CONSTRAINT ck_recruitment_period CHECK(opens_at < closes_at), CONSTRAINT ck_recruitment_quota CHECK(quota > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE recruitment_stages (

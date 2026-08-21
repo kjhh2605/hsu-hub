@@ -67,7 +67,7 @@ class FlywayMySqlTest {
         latest.clean();
         var result = latest.migrate();
 
-        assertThat(result.migrationsExecuted).isEqualTo(5);
+        assertThat(result.migrationsExecuted).isEqualTo(6);
         try (Connection connection = DriverManager.getConnection(
             MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())) {
             assertThat(queryNames(connection,
@@ -77,7 +77,12 @@ class FlywayMySqlTest {
                 .doesNotContain("password_hash", "email_verified_at", "email_normalized");
             assertThat(queryNames(connection,
                 "select table_name from information_schema.tables where table_schema = database()"))
+                .contains("club_introduction_images")
                 .doesNotContain("email_verification_tokens", "password_reset_tokens");
+            assertThat(queryNames(connection,
+                "select column_name from information_schema.columns " +
+                    "where table_schema = database() and table_name = 'clubs'"))
+                .contains("recruitment_status");
             assertThat(singleInt(connection, "select count(*) from clubs")).isEqualTo(5);
         }
     }
