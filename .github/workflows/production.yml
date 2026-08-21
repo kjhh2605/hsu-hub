@@ -141,8 +141,13 @@ jobs:
           "$REPOSITORY_URI:$IMAGE_TAG"
       - name: Push backend image
         run: |
-          aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}"
-          docker push "$REPOSITORY_URI:$IMAGE_TAG"
+          repository_name=${REPOSITORY_URI#*/}
+          if aws ecr describe-images --repository-name "$repository_name" --image-ids "imageTag=$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "reusing existing immutable backend image: $REPOSITORY_URI:$IMAGE_TAG"
+          else
+            aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}"
+            docker push "$REPOSITORY_URI:$IMAGE_TAG"
+          fi
       - name: Install frontend dependencies
         run: npm ci
       - name: Build applicant frontend
