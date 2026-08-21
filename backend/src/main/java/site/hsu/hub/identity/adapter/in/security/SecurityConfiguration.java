@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -46,15 +47,20 @@ public class SecurityConfiguration {
     SecurityFilterChain filterChain(
         HttpSecurity http,
         SessionAuthenticationFilter session,
-        ObjectMapper mapper
+        ObjectMapper mapper,
+        @Value("${hsu.security.secure-cookies:true}") boolean secureCookies,
+        @Value("${hsu.security.csrf-cookie-name:__Host-XSRF-TOKEN}") String csrfCookieName
     ) throws Exception {
         var csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrf.setCookieName("__Host-XSRF-TOKEN");
+        csrf.setCookieName(csrfCookieName);
         csrf.setHeaderName("X-XSRF-TOKEN");
-        csrf.setCookieCustomizer(cookie -> cookie.secure(true).path("/").sameSite("Lax"));
+        csrf.setCookieCustomizer(cookie -> cookie.secure(secureCookies).path("/").sameSite("Lax"));
+        var csrfRequestHandler = new CsrfTokenRequestAttributeHandler();
         http
             .sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(configuration -> configuration.csrfTokenRepository(csrf))
+            .csrf(configuration -> configuration
+                .csrfTokenRepository(csrf)
+                .csrfTokenRequestHandler(csrfRequestHandler))
             .cors(configuration -> {})
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/kakao/start", "/api/v1/auth/kakao/callback").permitAll()

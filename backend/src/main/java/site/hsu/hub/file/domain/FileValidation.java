@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream;
 public final class FileValidation {
     public static final int RESUME_MAX = 10 * 1024 * 1024;
     public static final int COVER_MAX = 5 * 1024 * 1024;
+    public static final int INTRODUCTION_IMAGE_MAX = COVER_MAX;
     private FileValidation() {}
 
     public static void validateResume(String filename, String contentType, byte[] bytes) {
@@ -25,8 +26,16 @@ public final class FileValidation {
     }
 
     public static void validateCover(String filename, String contentType, byte[] bytes) {
-        if (bytes == null || bytes.length == 0 || bytes.length > COVER_MAX)
-            throw new ApiException(bytes != null && bytes.length > COVER_MAX ? ErrorCode.PAYLOAD_TOO_LARGE : ErrorCode.VALIDATION_FAILED, "커버 이미지 크기를 확인해 주세요.");
+        validateImage(filename, contentType, bytes, COVER_MAX, "커버 이미지 크기를 확인해 주세요.");
+    }
+
+    public static void validateIntroductionImage(String filename, String contentType, byte[] bytes) {
+        validateImage(filename, contentType, bytes, INTRODUCTION_IMAGE_MAX, "소개 이미지를 확인해 주세요.");
+    }
+
+    private static void validateImage(String filename, String contentType, byte[] bytes, int max, String sizeMessage) {
+        if (bytes == null || bytes.length == 0 || bytes.length > max)
+            throw new ApiException(bytes != null && bytes.length > max ? ErrorCode.PAYLOAD_TOO_LARGE : ErrorCode.VALIDATION_FAILED, sizeMessage);
         boolean jpeg = bytes.length > 3 && (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff;
         boolean png = bytes.length > 8 && bytes[0] == (byte)0x89 && bytes[1] == 0x50 && bytes[2] == 0x4e && bytes[3] == 0x47;
         boolean webp = bytes.length > 12 && new String(bytes, 0, 4, StandardCharsets.US_ASCII).equals("RIFF")

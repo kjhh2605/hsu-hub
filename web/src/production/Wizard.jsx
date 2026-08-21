@@ -7,7 +7,7 @@ import { api, messageOf } from './api';
 import { ErrorNotice, PageHeader } from './Shell';
 
 const starter = () => ({
-  title: '', quota: 10, openAt: '', closeAt: '', summary: '', content: '',
+  openAt: '', closeAt: '',
   stages: [
     { type: 'DOCUMENT_RESULT', label: '서류 결과', enabled: true, startAt: '' },
     { type: 'INTERVIEW', label: '면접', enabled: true, startAt: '', endAt: '' },
@@ -27,7 +27,7 @@ export function WizardProvider({ children }) {
 }
 const useWizard = () => useContext(WizardContext);
 const steps = [
-  { id: 'page', label: '페이지 편집', path: '/admin/recruitments/new/page' },
+  { id: 'page', label: '모집 일정', path: '/admin/recruitments/new/page' },
   { id: 'stages', label: '전형 설정', path: '/admin/recruitments/new/stages' },
   { id: 'form', label: '지원서 설계', path: '/admin/recruitments/new/form' },
   { id: 'review', label: '검토 및 게시', path: '/admin/recruitments/new/review' },
@@ -39,13 +39,14 @@ const Input = ({ label, ...props }) => <label>{label}<input {...props} /></label
 
 export function WizardPage() {
   const { draft, update } = useWizard();
-  return <WizardFrame active="page" title="모집 페이지 편집" description="지원자가 처음 마주할 핵심 정보와 소개를 작성합니다." next="/admin/recruitments/new/stages" preview={<RecruitmentPreview draft={draft} />}><div className="section-title"><span>01</span><div><h2>기본 정보</h2><p>제목과 지원 기간은 모집 상태를 결정합니다.</p></div></div><div className="editor-fields"><Input label="모집 제목" value={draft.title} onChange={(e) => update({ title: e.target.value })} placeholder="예: 14기 신규 부원 모집" /><div className="two-fields"><Input label="모집 인원" type="number" min="1" value={draft.quota} onChange={(e) => update({ quota: Number(e.target.value) })} /><Input label="한 줄 소개" value={draft.summary} onChange={(e) => update({ summary: e.target.value })} /></div><div className="two-fields"><Input label="지원 시작" type="datetime-local" value={draft.openAt} onChange={(e) => update({ openAt: e.target.value })} /><Input label="지원 마감" type="datetime-local" value={draft.closeAt} onChange={(e) => update({ closeAt: e.target.value })} /></div><label>모집 상세 내용<textarea rows="10" value={draft.content} onChange={(e) => update({ content: e.target.value })} placeholder="활동 내용, 찾는 사람, 지원 전 확인사항을 작성해 주세요." /></label></div></WizardFrame>;
+  return <WizardFrame active="page" title="모집 일정" description="동아리 프로필 소개글을 기준으로 지원 기간만 설정합니다." next="/admin/recruitments/new/stages"><div className="section-title"><span>01</span><div><h2>지원 기간</h2><p>소개글은 동아리 프로필에서 관리하고, 모집관리는 일정과 절차만 관리합니다.</p></div></div><div className="editor-fields"><div className="two-fields"><Input label="지원 시작" type="datetime-local" value={draft.openAt} onChange={(e) => update({ openAt: e.target.value })} /><Input label="지원 마감" type="datetime-local" value={draft.closeAt} onChange={(e) => update({ closeAt: e.target.value })} /></div></div></WizardFrame>;
 }
-function RecruitmentPreview({ draft }) { return <aside className="phone-preview"><header><Eye size={15} /> 지원자 모바일 미리보기</header><div className="phone-frame"><div className="phone-top">HSU HUB</div><section className="preview-hero"><small>RECRUITING</small><h2>{draft.title || '모집 제목을 입력해 주세요'}</h2><p>{draft.summary || '모집을 소개하는 한 문장이 표시됩니다.'}</p></section><section><strong>모집 안내</strong><p>{draft.content || '상세 모집 내용이 여기에 표시됩니다.'}</p></section><button>지원서 작성하기</button></div></aside>; }
 
 export function WizardStages() {
   const { draft, update } = useWizard(); const change = (index, patch) => update({ stages: draft.stages.map((stage, i) => i === index ? { ...stage, ...patch } : stage) });
-  return <WizardFrame active="stages" title="전형 일정 설정" description="MVP에서는 일정을 안내용으로 보관하며 별도 결과 처리는 제공하지 않습니다." previous="/admin/recruitments/new/page" next="/admin/recruitments/new/form"><div className="section-title"><span>02</span><div><h2>전형 단계</h2><p>서류 결과, 면접, 최종 결과 일정을 구성합니다.</p></div></div><div className="stage-list"><article className="stage-card fixed"><span>1</span><div><strong>지원서 접수</strong><p>{draft.openAt || '시작 미정'} — {draft.closeAt || '마감 미정'}</p></div><small>필수</small></article>{draft.stages.map((stage, index) => <article className={`stage-card ${stage.enabled ? '' : 'muted'}`} key={stage.type}><span>{index + 2}</span><div className="stage-fields"><label className="toggle"><input type="checkbox" checked={stage.enabled} onChange={(e) => change(index, { enabled: e.target.checked })} /> {stage.label} 사용</label><div className="two-fields"><Input aria-label={`${stage.label} 시작`} label={stage.type === 'INTERVIEW' ? '시작 일시' : '안내 일시'} type="datetime-local" value={stage.startAt} onChange={(e) => change(index, { startAt: e.target.value })} />{stage.type === 'INTERVIEW' && <Input label="종료 일시" type="datetime-local" value={stage.endAt} onChange={(e) => change(index, { endAt: e.target.value })} />}</div></div></article>)}</div></WizardFrame>;
+  const missingApplicationDates = [!draft.openAt && '지원 시작일', !draft.closeAt && '지원 마감일'].filter(Boolean);
+  const applicationDateWarning = missingApplicationDates.length > 0 ? `${missingApplicationDates.join('과 ')}을 입력해 주세요.` : null;
+  return <WizardFrame active="stages" title="전형 일정 설정" description="MVP에서는 일정을 안내용으로 보관하며 별도 결과 처리는 제공하지 않습니다." previous="/admin/recruitments/new/page" next="/admin/recruitments/new/form"><div className="section-title"><span>02</span><div><h2>전형 단계</h2><p>서류 결과, 면접, 최종 결과 일정을 구성합니다.</p></div></div><div className="stage-list"><article className="stage-card required"><span>1</span><div><strong>지원서 접수</strong><p className={applicationDateWarning ? 'stage-date warning' : 'stage-date'}>{draft.openAt || '시작 미정'} — {draft.closeAt || '마감 미정'}</p>{applicationDateWarning && <p className="stage-warning" role="alert">{applicationDateWarning}</p>}</div><small>필수</small></article>{draft.stages.map((stage, index) => <article className={`stage-card ${stage.enabled ? '' : 'muted'}`} key={stage.type}><span>{index + 2}</span><div className="stage-fields"><label className="toggle"><input type="checkbox" checked={stage.enabled} onChange={(e) => change(index, { enabled: e.target.checked })} /> {stage.label} 사용</label><div className="two-fields"><Input aria-label={`${stage.label} 시작`} label={stage.type === 'INTERVIEW' ? '시작 일시' : '안내 일시'} type="datetime-local" value={stage.startAt} onChange={(e) => change(index, { startAt: e.target.value })} />{stage.type === 'INTERVIEW' && <Input label="종료 일시" type="datetime-local" value={stage.endAt} onChange={(e) => change(index, { endAt: e.target.value })} />}</div></div></article>)}</div></WizardFrame>;
 }
 
 const typeLabels = { SHORT_TEXT: '짧은 답변', LONG_TEXT: '긴 답변', SINGLE_CHOICE: '단일 선택', MULTIPLE_CHOICE: '복수 선택', DROPDOWN: '드롭다운', EMAIL: '이메일', TELEPHONE: '전화번호', RESUME: 'PDF / 링크', CONSENT: '필수 동의' };
@@ -77,8 +78,7 @@ export function buildPublishPayload(draft) {
     maxLength: question.maxLength || null, options: (question.options ?? []).map((option) => option.label),
   }));
   return {
-    title: draft.title, quota: draft.quota, opensAt: instant(draft.openAt), closesAt: instant(draft.closeAt),
-    contentBlocks: [{ type: 'PARAGRAPH', content: draft.content }],
+    opensAt: instant(draft.openAt), closesAt: instant(draft.closeAt),
     stages: [{ type: 'DOCUMENT', label: '지원서 접수', enabled: true, startsAt: instant(draft.openAt), endsAt: instant(draft.closeAt) }, ...draft.stages.map((stage) => ({ type: stage.type, label: stage.label, enabled: stage.enabled, startsAt: instant(stage.startAt), endsAt: instant(stage.endAt) }))],
     form: { steps: draft.steps.map((step) => ({ title: step.title, questions: questions(step.questions) })) },
   };
@@ -86,7 +86,7 @@ export function buildPublishPayload(draft) {
 
 export function WizardReview() {
   const { clubId } = useOperator(); const { draft, reset } = useWizard(); const navigate = useNavigate(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
-  const checks = [draft.title, draft.openAt, draft.closeAt, draft.content, draft.steps.every((step) => step.title.trim() && step.questions.length)]; const valid = checks.every(Boolean) && new Date(draft.openAt) < new Date(draft.closeAt);
+  const checks = [draft.openAt, draft.closeAt, draft.steps.every((step) => step.title.trim() && step.questions.length)]; const valid = checks.every(Boolean) && new Date(draft.openAt) < new Date(draft.closeAt);
   async function publish() {
     if (!valid) return setError('필수 정보와 지원 기간을 확인해 주세요.');
     setBusy(true); setError('');
@@ -95,5 +95,5 @@ export function WizardReview() {
       reset(); navigate('/admin/recruitments', { replace: true });
     } catch (reason) { setError(messageOf(reason)); } finally { setBusy(false); }
   }
-  return <WizardFrame active="review" title="검토 및 게시" description="게시 후에는 모집 내용과 지원서 구조를 수정할 수 없습니다." previous="/admin/recruitments/new/form"><div className="review-summary"><section><h2>게시 준비 상태</h2><div className="check-list">{['모집 제목', '지원 시작 일시', '지원 마감 일시', '모집 상세 내용', '지원서 단계·질문'].map((label, index) => <p className={checks[index] ? 'ok' : ''} key={label}><span>{checks[index] ? <Check size={15} /> : '!'}</span>{label}<small>{checks[index] ? '확인됨' : '입력이 필요합니다'}</small></p>)}</div></section><section className="publication-card"><p>모집 요약</p><h2>{draft.title || '제목 미입력'}</h2><dl><div><dt>모집 인원</dt><dd>{draft.quota}명</dd></div><div><dt>지원 기간</dt><dd>{draft.openAt || '미정'}<br />— {draft.closeAt || '미정'}</dd></div><div><dt>질문 수</dt><dd>{draft.steps.flatMap((step) => step.questions).length}개</dd></div></dl><ErrorNotice>{error}</ErrorNotice><button className="prod-button primary publish" disabled={busy || !valid} onClick={publish}><Send size={17} />{busy ? '게시 중…' : '모집 게시하기'}</button><small>게시 시 다른 활성 모집과 일정이 겹치면 서버가 거부합니다.</small></section></div></WizardFrame>;
+  return <WizardFrame active="review" title="검토 및 게시" description="게시 후에는 모집 일정과 지원서 구조를 수정할 수 없습니다." previous="/admin/recruitments/new/form"><div className="review-summary"><section><h2>게시 준비 상태</h2><div className="check-list">{['지원 시작 일시', '지원 마감 일시', '지원서 단계·질문'].map((label, index) => <p className={checks[index] ? 'ok' : ''} key={label}><span>{checks[index] ? <Check size={15} /> : '!'}</span>{label}<small>{checks[index] ? '확인됨' : '입력이 필요합니다'}</small></p>)}</div></section><section className="publication-card"><p>모집 일정</p><h2>동아리 프로필 소개글</h2><dl><div><dt>지원 기간</dt><dd>{draft.openAt || '미정'}<br />— {draft.closeAt || '미정'}</dd></div><div><dt>질문 수</dt><dd>{draft.steps.flatMap((step) => step.questions).length}개</dd></div></dl><ErrorNotice>{error}</ErrorNotice><button className="prod-button primary publish" disabled={busy || !valid} onClick={publish}><Send size={17} />{busy ? '게시 중…' : '모집 게시하기'}</button><small>게시 시 다른 활성 모집과 일정이 겹치면 서버가 거부합니다.</small></section></div></WizardFrame>;
 }

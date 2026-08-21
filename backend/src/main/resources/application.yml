@@ -41,6 +41,9 @@ springdoc:
 hsu:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://hsu-hub.site,https://admin.hsu-hub.site}
+  security:
+    secure-cookies: ${SECURE_COOKIES:true}
+    csrf-cookie-name: ${CSRF_COOKIE_NAME:__Host-XSRF-TOKEN}
   kakao:
     client-id: ${HSU_KAKAO_CLIENT_ID}
     client-secret: ${HSU_KAKAO_CLIENT_SECRET}
@@ -74,3 +77,6 @@ spring:
 hsu:
   storage:
     local-path: ${LOCAL_STORAGE_PATH:.local-storage}
+  security:
+    secure-cookies: false
+    csrf-cookie-name: XSRF-TOKEN

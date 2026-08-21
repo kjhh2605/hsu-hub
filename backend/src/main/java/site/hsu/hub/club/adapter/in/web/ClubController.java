@@ -5,4 +5,5 @@ import jakarta.servlet.http.HttpServletRequest;import org.springframework.http.*
  @Override@GetMapping public ApiResponse<List<ClubService.ClubView>>list(HttpServletRequest req){return Responses.ok(service.list(),req);}
  @Override@GetMapping("/{id}")public ApiResponse<ClubService.ClubView>get(@PathVariable Long id,HttpServletRequest req){return Responses.ok(service.get(id),req);}
  @Override@GetMapping("/{id}/cover")public ResponseEntity<byte[]>cover(@PathVariable Long id){var f=service.cover(id);return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.mediaType())).cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header(HttpHeaders.CONTENT_DISPOSITION,"inline").body(f.bytes());}
+ @Override @GetMapping("/{id}/introduction-images/{imageId}")public ResponseEntity<byte[]>introductionImage(@PathVariable Long id,@PathVariable Long imageId){var f=service.introductionImage(id,imageId);return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.mediaType())).cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header(HttpHeaders.CONTENT_DISPOSITION,"inline").body(f.bytes());}
 }

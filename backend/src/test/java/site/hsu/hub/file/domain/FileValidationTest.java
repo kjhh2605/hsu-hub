@@ -23,4 +23,15 @@ class FileValidationTest {
         assertThatThrownBy(() -> FileValidation.validateCover("cover.txt","image/png",png))
                 .isInstanceOf(ApiException.class);
     }
+
+    @Test void introductionImagesUseTheSameSafeImagePolicy() {
+        byte[] png=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        FileValidation.validateIntroductionImage("intro.png", "image/png", png);
+    }
+
+    @Test void oversizedIntroductionImageIsRejected() {
+        assertThatThrownBy(() -> FileValidation.validateIntroductionImage(
+                "intro.png", "image/png", new byte[FileValidation.INTRODUCTION_IMAGE_MAX + 1]))
+                .isInstanceOf(ApiException.class);
+    }
 }
