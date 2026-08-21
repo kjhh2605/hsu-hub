@@ -124,7 +124,7 @@ jobs:
       - name: Backend tests
         run: |
           test -x backend/gradlew
-          (cd backend && ./gradlew test)
+          (cd backend && ./gradlew test bootJar)
       - name: Build backend image
         env:
           IMAGE_TAG: sha-${{ github.sha }}

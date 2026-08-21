@@ -301,7 +301,7 @@ describe('PlatformStack', () => {
     });
   });
 
-  it('trusts only the production GitHub environment through OIDC', () => {
+  it('trusts only the production GitHub environment through its ID-based OIDC subject', () => {
     const template = synthesize();
 
     template.hasResourceProperties('AWS::IAM::Role', {
@@ -309,9 +309,9 @@ describe('PlatformStack', () => {
         Statement: Match.arrayWith([
           Match.objectLike({
             Condition: Match.objectLike({
-              StringEquals: Match.objectLike({
+              StringLike: Match.objectLike({
                 'token.actions.githubusercontent.com:sub':
-                  'repo:hsu-club/hsu-hub:environment:production',
+                  'repo:hsu-club@*/hsu-hub@*:environment:production',
               }),
             }),
           }),
