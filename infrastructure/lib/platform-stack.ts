@@ -630,7 +630,7 @@ CWCONFIG`,
       actions: ['ssm:SendCommand'],
       resources: [
         Arn.format({ service: 'ec2', resource: 'instance', resourceName: instance.instanceId, arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
-        Arn.format({ service: 'ssm', resource: 'document', resourceName: 'AWS-RunShellScript', arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
+        `arn:aws:ssm:${config.region}::document/AWS-RunShellScript`,
       ],
     }));
     deploymentRole.addToPolicy(new iam.PolicyStatement({
@@ -659,14 +659,14 @@ CWCONFIG`,
           actions: ['ssm:StartSession'],
           resources: [
             Arn.format({ service: 'ec2', resource: 'instance', resourceName: instance.instanceId, arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
-            Arn.format({ service: 'ssm', resource: 'document', resourceName: 'SSM-SessionManagerRunShell', arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
+            `arn:aws:ssm:${config.region}::document/SSM-SessionManagerRunShell`,
           ],
         }),
         new iam.PolicyStatement({
           actions: ['ssm:SendCommand'],
           resources: [
             Arn.format({ service: 'ec2', resource: 'instance', resourceName: instance.instanceId, arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
-            Arn.format({ service: 'ssm', resource: 'document', resourceName: 'AWS-RunShellScript', arnFormat: ArnFormat.SLASH_RESOURCE_NAME }, this),
+            `arn:aws:ssm:${config.region}::document/AWS-RunShellScript`,
           ],
         }),
         new iam.PolicyStatement({

@@ -320,6 +320,23 @@ describe('PlatformStack', () => {
     });
   });
 
+  it('authorizes SSM commands with the AWS-managed document ARN', () => {
+    const template = synthesize();
+
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'ssm:SendCommand',
+            Resource: Match.arrayWith([
+              'arn:aws:ssm:ap-northeast-2::document/AWS-RunShellScript',
+            ]),
+          }),
+        ]),
+      }),
+    });
+  });
+
   it('alarms on backend 5xx percentage rather than only an absolute count', () => {
     const template = synthesize();
 
